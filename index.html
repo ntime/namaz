@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Время намазов</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            width: 100vw;
+            min-height: 100vh;
+            padding: 10px;
+            background: linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%);
+            color: white;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: clamp(24px, 6vw, 32px);
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #fff, #a8d8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .date {
+            font-size: clamp(16px, 4vw, 20px);
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .time {
+            font-size: clamp(18px, 5vw, 24px);
+            font-weight: bold;
+            opacity: 0.9;
+        }
+        
+        .location {
+            font-size: clamp(14px, 3vw, 16px);
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+        
+        .prayer-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: clamp(16px, 4vw, 20px);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .prayer-table th, .prayer-table td {
+            padding: 16px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .prayer-table th {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+            text-align: center;
+            font-size: clamp(14px, 3vw, 18px);
+        }
+        
+        /* Цвета для разных времен намаза */
+        .fajr {
+            background: linear-gradient(90deg, rgba(25, 25, 112, 0.9) 0%, rgba(65, 105, 225, 0.7) 100%);
+        }
+        
+        .sunrise {
+            background: linear-gradient(90deg, rgba(255, 140, 0, 0.9) 0%, rgba(255, 165, 0, 0.7) 100%);
+        }
+        
+        .dhuhr {
+            background: linear-gradient(90deg, rgba(255, 215, 0, 0.9) 0%, rgba(255, 255, 0, 0.7) 100%);
+        }
+        
+        .asr {
+            background: linear-gradient(90deg, rgba(255, 140, 0, 0.7) 0%, rgba(255, 69, 0, 0.5) 100%);
+        }
+        
+        .maghrib {
+            background: linear-gradient(90deg, rgba(178, 34, 34, 0.9) 0%, rgba(255, 69, 0, 0.7) 100%);
+        }
+        
+        .isha {
+            background: linear-gradient(90deg, rgba(25, 25, 112, 0.7) 0%, rgba(0, 0, 139, 0.9) 100%);
+        }
+        
+        .white-night {
+            color: #a8d8ff;
+            font-style: italic;
+            text-align: center;
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(168, 216, 255, 0.2);
+            border-radius: 8px;
+            font-size: clamp(14px, 3vw, 16px);
+        }
+        
+        @media (min-width: 768px) {
+            .container {
+                max-width: 600px;
+            }
+            
+            .prayer-table {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Главная страница -->
+        <div id="mainPage">
+            <div class="header">
+                <h1>Время намазов</h1>
+                <div class="date" id="currentDate"></div>
+                <div class="time" id="currentTime"></div>
+            </div>
+            <div id="prayerTimesTable"></div>
+        </div>
+    </div>
+
+    <script>
+        // Жестко заданные константы
+        const LATITUDE  = 52.26;// широта
+        const LONGITUDE = -7.12;// долгота
+        const TIME_ZONE = 0;    // часовой пояс
+        const DST       = 1;    // осуществляется ли переход на летнее время
+        const MORNING_TWILIGHT = -18; // угол утренних сумерек
+        const EVENING_TWILIGHT = -17; // угол вечерних сумерек
+        const WHITE_NIGHTS_METHOD= 1; // метод решения проблемы "белых ночей"
+
+        // Константы для расчетов
+        const months_short = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
+        const namazlar = ['Фаджр', 'Восход', 'Зухр', 'Аср', 'Магриб', 'Иша'];
+        const prayerClasses = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+        const no_night = "* - светлые ночи";
+
+        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+        function is_leap(y) {
+            return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+        }
+
+        function ut2dt(ut) {
+            ut = Math.round(ut);
+            let days = Math.floor(ut / 86400);
+            let seconds_remaining = ut % 86400;
+            let hours = Math.floor(seconds_remaining / 3600);
+            seconds_remaining %= 3600;
+            let minutes = Math.floor(seconds_remaining / 60);
+            let seconds = seconds_remaining % 60;
+            let year = 1970;
+            
+            while (days >= (is_leap(year) ? 366 : 365)) {
+                days -= is_leap(year) ? 366 : 365;
+                year++;
+            }
+            
+            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            let month = 1;
+            for (let md of month_days) {
+                if (days < md) break;
+                days -= md;
+                month++;
+            }
+            return [year, month, days + 1, hours, minutes, seconds];
+        }
+
+        function dt2ut(year, month, day, hour = 0, minute = 0, second = 0) {
+            let days = 0;
+            for (let y = 1970; y < year; y++) {
+                days += is_leap(y) ? 366 : 365;
+            }
+            
+            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            for (let m = 0; m < month - 1; m++) {
+                days += month_days[m];
+            }
+            days += day - 1;
+            return days * 86400 + hour * 3600 + minute * 60 + second;
+        }
+
+        function get_weekday(year, month, day) {
+            let m = month;
+            let y = year;
+            if (m < 3) {
+                m += 12;
+                y -= 1;
+            }
+            let k = y % 100;
+            let j = Math.floor(y / 100);
+            let h = (day + Math.floor(13 * (m + 1) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) + 5 * j) % 7;
+            let r = (h + 6) % 7;
+            return r;
+        }
+
+        function get_last_sunday(year, month, hour, minute, second, time_zone) {
+            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            const last_day = month_days[month - 1];
+            const last_weekday = get_weekday(year, month, last_day);
+            const last_sunday_day = last_day - last_weekday;
+            const ut = dt2ut(year, month, last_sunday_day, hour, minute, second);
+            return ut - time_zone * 3600;
+        }
+
+        function is_dst(ut, time_zone, dst) {
+            if (dst === 0) return 0;
+            
+            const [year, month, day, hour, minute, second] = ut2dt(ut);
+            const dst_start = get_last_sunday(year, 3, 2, 0, 0, time_zone);
+            const dst_end = get_last_sunday(year, 10, 2, 0, 0, time_zone);
+            return (dst_start <= ut && ut < dst_end) ? 1 : 0;
+        }
+
+        function normalize(value, base) {
+            return value - base * Math.floor(value / base);
+        }
+
+        function f_to_hms(hh) {
+            let hours = Math.floor(hh);
+            let minutes = (hh - hours) * 60;
+            let min_int = Math.floor(minutes);
+            let seconds = (minutes - min_int) * 60;
+            let sec_int = Math.round(seconds);
+            
+            if (sec_int >= 60) {
+                sec_int = 0;
+                min_int += 1;
+            }
+            if (min_int >= 60) {
+                min_int = 0;
+                hours += 1;
+            }
+            if (hours >= 24) {
+                hours -= 24;
+            }
+            return [hours, min_int, sec_int];
+        }
+
+        function f_to_hms_str(hours_decimal) {
+            hours_decimal = normalize(hours_decimal, 24);
+            const [h, m, s] = f_to_hms(Math.abs(hours_decimal));
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // ==================== АСТРОНОМИЧЕСКИЕ РАСЧЕТЫ ====================
+        function calc_jd(ut) {
+            return 2440587.5 + (ut / 86400.0);
+        }
+
+        function usno_sun(ut) {
+            const jd = calc_jd(ut);
+            const D = jd - 2451545.0;
+            let g = normalize(357.5291092 + 0.985600274 * D, 360);
+            let q = normalize(280.4664567 + 0.985647366286 * D, 360);
+            let L = normalize(q + 1.915 * Math.sin(g * Math.PI / 180) + 0.020 * Math.sin(2 * g * Math.PI / 180), 360);
+            let e = normalize(23.439 - 0.00000036 * D, 360);
+            e = normalize(e + 0.00256 * Math.cos((125.04 - 1934.136 * D / 36525) * Math.PI / 180), 360);
+            let ra = Math.atan2(Math.cos(e * Math.PI / 180) * Math.sin(L * Math.PI / 180), Math.cos(L * Math.PI / 180)) * 180 / Math.PI;
+            const dec = Math.asin(Math.sin(e * Math.PI / 180) * Math.sin(L * Math.PI / 180)) * 180 / Math.PI;
+            if (ra < 0) ra += 360;
+            const EqT = (q - ra) / 15.0;
+            ra /= 15.0;
+            const R = 1.00014 - 0.01671 * Math.cos(g * Math.PI / 180) - 0.00014 * Math.cos(2 * g * Math.PI / 180);
+            const SD = 0.26656 / R;
+            return [ra, dec, EqT, SD];
+        }
+
+        function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
+            const [ra, dec, EqT, SD] = usno_sun(ut);
+
+            function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 15) {
+                if (altitude_deg <= -1) return 0.0;
+                const P0 = 1010, T0 = 283.0;
+                let R_deg;
+
+                if (altitude_deg > 15) {
+                    const z = 90.0 - altitude_deg;
+                    const tan_z = Math.tan(z * Math.PI / 180);
+                    const R_arcsec = 58.276 * tan_z - 0.0824 * Math.pow(tan_z, 3);
+                    R_deg = R_arcsec / 3600.0;
+                } else {
+                    const R_arcmin = 1.0 / Math.tan((altitude_deg + 7.31 / (altitude_deg + 4.4)) * Math.PI / 180);
+                    R_deg = R_arcmin / 60.0;
+                }
+                return R_deg * (pressure / P0) * (T0 / (273.0 + temperature));
+            }
+
+            function Level(angle) {
+                const numerator = Math.sin(angle * Math.PI / 180) - Math.sin(dec * Math.PI / 180) * Math.sin(latitude * Math.PI / 180);
+                const denominator = Math.cos(dec * Math.PI / 180) * Math.cos(latitude * Math.PI / 180);
+                if (Math.abs(denominator) < 1e-10 || Math.abs(numerator) > Math.abs(denominator)) {
+                    return false;
+                }
+                const cos_val = numerator / denominator;
+                if (Math.abs(cos_val) > 1) return false;
+                return Math.acos(cos_val) * 180 / Math.PI / 15;
+            }
+
+            const t = [0, 0, 0, 0, 0, 0, 0, 0];
+            t[0] = 12 - longitude / 15.0 - EqT;
+
+            const angle = SD + meeus_refraction(0);
+            const lvl_val = Level(angle);
+            t[1] = lvl_val !== false ? t[0] - lvl_val : false;
+            t[2] = lvl_val !== false ? t[0] + lvl_val : false;
+            
+            const asr_angle = Math.atan(1.0 / (1.0 + Math.tan(Math.abs(latitude - dec) * Math.PI / 180))) * 180 / Math.PI;
+            const asr_angle_corr = asr_angle - meeus_refraction(asr_angle);
+            const asr_level = Level(asr_angle_corr);
+            t[3] = asr_level !== false ? t[0] + asr_level : false;
+            
+            let ff = Level(morning_twilight);
+            let ii = Level(evening_twilight);
+            t[6] = (ff === false) || (ii === false);
+            t[7] = t[6];
+
+            // Обработка белых ночей
+            if (t[6]) {
+                if (white_nights_method === 1) {
+                    let adjusted_latitude = Math.acos(-Math.sin(morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
+                    adjusted_latitude -= 9e-8;
+                    latitude = adjusted_latitude;
+                    ff = Level(morning_twilight);
+                    ii = Level(evening_twilight);
+                } else if (white_nights_method === 2) {
+                    let temp_morning = morning_twilight;
+                    let temp_evening = evening_twilight;
+                    while (ff === false) {
+                        temp_morning += 0.0001;
+                        ff = Level(temp_morning);
+                    }
+                    while (ii === false) {
+                        temp_evening += 0.0001;
+                        ii = Level(temp_evening);
+                    }
+                    if (Math.abs(ff - ii) < 10 / 60.0) {
+                        ff = 12 - 5 / 60;
+                        ii = -12 - 5 / 60;
+                    }
+                } else if (white_nights_method === 5 || white_nights_method === 7) {
+                    const divisor = white_nights_method === 5 ? 5 : 7;
+                    const night_long = (24 - t[2] + t[1]) / divisor;
+                    t[4] = t[0] - (t[0] - t[1] + night_long);
+                    t[5] = t[0] + (-t[0] + t[2] + night_long);
+                    return [t[4], t[1], t[0], t[3], t[2], t[5], t[6], t[7]];
+                }
+            }
+            t[4] = ff !== false ? t[0] - ff : false;
+            t[5] = ii !== false ? t[0] + ii : false;
+            return [t[4], t[1], t[0], t[3], t[2], t[5], t[6], t[7]];
+        }
+
+        function calc_plus(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
+            const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method);
+            const r = [0, 0, 0, 0, 0, 0, false, false];
+            let last_p = null;
+            
+            for (let i = 0; i < 6; i++) {
+                if (t[i] === false) {
+                    r[i] = false;
+                    continue;
+                }
+                last_p = calculate(latitude, longitude, ut + t[i] * 3600, morning_twilight, evening_twilight, white_nights_method);
+                r[i] = last_p[i];
+            }
+            r[6] = r[7] = last_p ? (last_p[6] && last_p[7]) : false;
+            return r;
+        }
+
+        // ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
+        function get_today() {
+            let ut = Date.now() / 1000;
+            ut = ut - (ut % 86400) + 12 * 3600;
+
+            const t = calc_plus(LATITUDE, LONGITUDE, ut, MORNING_TWILIGHT, EVENING_TWILIGHT, WHITE_NIGHTS_METHOD);
+            const p = calc_plus(LATITUDE, LONGITUDE, ut + 86400, MORNING_TWILIGHT, EVENING_TWILIGHT, WHITE_NIGHTS_METHOD);
+            
+            const today_offset = TIME_ZONE + is_dst(ut, TIME_ZONE, DST);
+            const tomorrow_offset = TIME_ZONE + is_dst(ut + 86400, TIME_ZONE, DST);
+            
+            const [_, month, day, __, ___, ____] = ut2dt(ut + today_offset * 3600);
+            
+            const result = {
+                date: `${day.toString().padStart(2, '0')} ${months_short[month - 1]}`,
+                times: [],
+                hasWhiteNights: false
+            };
+            
+            for (let i = 0; i < 6; i++) {
+                const tt_offset = TIME_ZONE + is_dst(ut + t[i] * 3600.0, TIME_ZONE, DST);
+                const tp_offset = TIME_ZONE + is_dst(ut + p[i] * 3600.0 + 86400, TIME_ZONE, DST);
+                
+                let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
+                let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
+                
+                let isWhiteNight = false;
+                if (t[6]) {
+                    if (i === 0 || i === 5) {
+                        if (WHITE_NIGHTS_METHOD === 0) {
+                            todayTime = "--:--:--";
+                            tomorrowTime = "--:--:--";
+                        }
+                        isWhiteNight = true;
+                        result.hasWhiteNights = true;
+                    }
+                }
+                
+                result.times.push({
+                    name: namazlar[i],
+                    today: todayTime,
+                    tomorrow: tomorrowTime,
+                    isWhiteNight: isWhiteNight,
+                    class: prayerClasses[i]
+                });
+            }
+            
+            return result;
+        }
+
+        function updateCurrentDateTime() {
+            const now = new Date();
+            const dateOptions = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric'
+            };
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            };
+            
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('ru-RU', dateOptions);
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('ru-RU', timeOptions);
+        }
+
+        function updatePrayerTimes() {
+            const result = get_today();
+            
+            let tableHTML = `
+                <table class="prayer-table">
+                    <thead>
+                        <tr>
+                            <th>Намаз</th>
+                            <th>Сегодня (${result.date})</th>
+                            <th>Завтра</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            result.times.forEach(prayer => {
+                const todayClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
+                const tomorrowClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
+                
+                tableHTML += `
+                    <tr>
+                        <td>${prayer.name}</td>
+                        <td class="${todayClass}">${prayer.today}</td>
+                        <td class="${tomorrowClass}">${prayer.tomorrow}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+            
+            if (result.hasWhiteNights) {
+                tableHTML += `<div class="white-night">${no_night}</div>`;
+            }
+            
+            document.getElementById('prayerTimesTable').innerHTML = tableHTML;
+        }
+
+        function updateAll() {
+            updateCurrentDateTime();
+            updatePrayerTimes();
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAll();
+            
+            // Обновляем время каждую секунду
+            setInterval(updateCurrentDateTime, 1000);
+            
+            // Обновляем таблицу каждые 30 секунд
+            setInterval(updatePrayerTimes, 30000);
+        });
+    </script>
+</body>
+</html>
