@@ -415,6 +415,8 @@
 
         function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
             try {
+                morning_twilight = -Math.abs(morning_twilight);
+                evening_twilight = -Math.abs(evening_twilight);
                 const [ra, dec, EqT, SD] = usno_sun(ut);
 
                 function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 15) {
@@ -437,7 +439,7 @@
                 function Level(angle) {
                     if (isNaN(angle)) return false;
                     
-                    const numerator = Math.sin(angle * Math.PI / 180) - Math.sin(dec * Math.PI / 180) * Math.sin(latitude * Math.PI / 180);
+                    const numerator = Math.sin(-angle * Math.PI / 180) - Math.sin(dec * Math.PI / 180) * Math.sin(latitude * Math.PI / 180);
                     const denominator = Math.cos(dec * Math.PI / 180) * Math.cos(latitude * Math.PI / 180);
                     
                     if (Math.abs(denominator) < 1e-10 || Math.abs(numerator) > Math.abs(denominator)) {
@@ -460,7 +462,7 @@
                 
                 const asr_angle = Math.atan(1.0 / (1.0 + Math.tan(Math.abs(latitude - dec) * Math.PI / 180))) * 180 / Math.PI;
                 const asr_angle_corr = asr_angle - meeus_refraction(asr_angle);
-                const asr_level = Level(asr_angle_corr);
+                const asr_level = Level(-asr_angle_corr);
                 t[3] = asr_level !== false ? t[0] + asr_level : false;
                 
                 let ff = Level(morning_twilight);
