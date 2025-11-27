@@ -197,13 +197,13 @@
             
             <div class="settings-group">
                 <label>Угол 1 (утренние сумерки)</label>
-                <input type="text" id="angle1" value="-18">
+                <input type="text" id="angle1" value="18">
                 <div id="angle1Error" class="error"></div>
             </div>
             
             <div class="settings-group">
                 <label>Угол 2 (вечерние сумерки)</label>
-                <input type="text" id="angle2" value="-17">
+                <input type="text" id="angle2" value="17">
                 <div id="angle2Error" class="error"></div>
             </div>
             
@@ -759,8 +759,8 @@
                             document.getElementById('daylightNo').checked = true;
                         }
                         
-                        document.getElementById('angle1').value = settings[5] || '-18';
-                        document.getElementById('angle2').value = settings[6] || '-17';
+                        document.getElementById('angle1').value = settings[5] || '18';
+                        document.getElementById('angle2').value = settings[6] || '17';
                         
                         const twilightValue = settings[7] || '1';
                         document.querySelector(`input[name="twilight"][value="${twilightValue}"]`).checked = true;
@@ -808,8 +808,8 @@
                 document.getElementById('height').value = '0';
                 document.getElementById('timezone').value = '0';
                 document.getElementById('daylightYes').checked = true;
-                document.getElementById('angle1').value = '-18';
-                document.getElementById('angle2').value = '-17';
+                document.getElementById('angle1').value = '18';
+                document.getElementById('angle2').value = '17';
                 document.getElementById('method2').checked = true;
                 
                 document.querySelectorAll('.error').forEach(el => el.textContent = '');
