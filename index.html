@@ -170,12 +170,6 @@
             </div>
             
             <div class="settings-group">
-                <label>Высота (метры)</label>
-                <input type="text" id="height" value="0">
-                <div id="heightError" class="error"></div>
-            </div>
-            
-            <div class="settings-group">
                 <label>Часовой пояс</label>
                 <input type="text" id="timezone" value="0">
                 <div id="timezoneError" class="error"></div>
@@ -625,12 +619,6 @@
                 isValid = false;
             }
             
-            const height = parseFloat(document.getElementById('height').value);
-            if (isNaN(height)) {
-                document.getElementById('heightError').textContent = 'Высота должна быть числом';
-                isValid = false;
-            }
-            
             const timezone = parseFloat(document.getElementById('timezone').value);
             if (isNaN(timezone) || timezone < -12 || timezone > 14) {
                 document.getElementById('timezoneError').textContent = 'Часовой пояс должен быть числом от -12 до 14';
@@ -747,22 +735,21 @@
             if (saved) {
                 try {
                     const settings = saved.split(';');
-                    if (settings.length >= 8) {
+                    if (settings.length >= 7) {
                         document.getElementById('latitude').value = settings[0] || '';
                         document.getElementById('longitude').value = settings[1] || '';
-                        document.getElementById('height').value = settings[2] || '0';
-                        document.getElementById('timezone').value = settings[3] || '0';
+                        document.getElementById('timezone').value = settings[2] || '0';
                         
-                        if (settings[4] === '1') {
+                        if (settings[3] === '1') {
                             document.getElementById('daylightYes').checked = true;
                         } else {
                             document.getElementById('daylightNo').checked = true;
                         }
                         
-                        document.getElementById('angle1').value = settings[5] || '18';
-                        document.getElementById('angle2').value = settings[6] || '17';
+                        document.getElementById('angle1').value = settings[4] || '-18';
+                        document.getElementById('angle2').value = settings[5] || '-17';
                         
-                        const twilightValue = settings[7] || '1';
+                        const twilightValue = settings[6] || '1';
                         document.querySelector(`input[name="twilight"][value="${twilightValue}"]`).checked = true;
                     }
                 } catch (e) {
@@ -781,14 +768,13 @@
             try {
                 const latitude = document.getElementById('latitude').value;
                 const longitude = document.getElementById('longitude').value;
-                const height = document.getElementById('height').value;
                 const timezone = document.getElementById('timezone').value;
                 const daylight = document.querySelector('input[name="daylight"]:checked')?.value || '0';
                 const angle1 = document.getElementById('angle1').value;
                 const angle2 = document.getElementById('angle2').value;
                 const twilightMethod = document.querySelector('input[name="twilight"]:checked')?.value || '0';
                 
-                const settingsString = [latitude, longitude, height, timezone, daylight, angle1, angle2, twilightMethod].join(';');
+                const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2, twilightMethod].join(';');
                 localStorage.setItem('astroSettings', settingsString);
                 
                 document.getElementById('settingsPage').style.display = 'none';
@@ -805,7 +791,6 @@
             if (confirm("Вы уверены, что хотите сбросить настройки к значениям по умолчанию?")) {
                 document.getElementById('latitude').value = '';
                 document.getElementById('longitude').value = '';
-                document.getElementById('height').value = '0';
                 document.getElementById('timezone').value = '0';
                 document.getElementById('daylightYes').checked = true;
                 document.getElementById('angle1').value = '18';
