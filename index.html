@@ -409,8 +409,8 @@
 
         function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
             try {
-                morning_twilight = -Math.abs(morning_twilight);
-                evening_twilight = -Math.abs(evening_twilight);
+                morning_twilight = Math.abs(morning_twilight);
+                evening_twilight = Math.abs(evening_twilight);
                 const [ra, dec, EqT, SD] = usno_sun(ut);
 
                 function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 15) {
