@@ -185,7 +185,7 @@
             </div>
 
             <div class="settings-group">
-                <label>Переводится ли время</label>
+                <label>Переводится ли время на летнее/зимнее</label>
                 <div class="radio-group">
                     <div class="radio-option">
                         <input type="radio" id="daylightYes" name="daylight" value="1" checked>
@@ -215,7 +215,7 @@
                 <div class="radio-group">
                     <div class="radio-option">
                         <input type="radio" id="method1" name="twilight" value="0">
-                        <label for="method1">0 - не считать</label>
+                        <label for="method1">0 - не считать (--:--:--)</label>
                     </div>
                     <div class="radio-option">
                         <input type="radio" id="method2" name="twilight" value="1" checked>
@@ -226,12 +226,8 @@
                         <label for="method3">2 - разделение 10 мин</label>
                     </div>
                     <div class="radio-option">
-                        <input type="radio" id="method5" name="twilight" value="5">
-                        <label for="method5">5 - 1/5 ночи</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="method7" name="twilight" value="7">
-                        <label for="method7">7 - 1/7 ночи</label>
+                        <input type="radio" id="method5" name="twilight" value="3">
+                        <label for="method5">3 - пропорциональный рассчет</label>
                     </div>
                 </div>
             </div>
@@ -504,8 +500,8 @@
                             ff = 12 - 5 / 60;
                             ii = -12 - 5 / 60;
                         }
-                    } else if (white_nights_method === 5 || white_nights_method === 7) {
-                        const divisor = white_nights_method === 5 ? 5 : 7;
+                    } else if (white_nights_method === 3) {
+                        const divisor = 7;
                         const night_long = (24 - t[2] + t[1]) / divisor;
                         t[4] = t[0] - (t[0] - t[1] + night_long);
                         t[5] = t[0] + (-t[0] + t[2] + night_long);
