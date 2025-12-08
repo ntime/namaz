@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Основная иконка для всех браузеров -->
     <link rel="icon" type="image/png" href="ico_4.png">
-    <!-- Для iOS всех размеров -->
     <link rel="apple-touch-icon" href="ico_4.png">
     <link rel="apple-touch-icon" sizes="512x512" href="ico_4.png">
-    <!-- iOS мета-теги -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Намаз</title>
@@ -52,7 +49,7 @@
         .prayer-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
             font-family: monospace;
             font-size: clamp(16px, 4vw, 20px);
             background: rgba(255, 255, 255, 0.1);
@@ -95,7 +92,7 @@
             background: rgba(255, 255, 255, 0.1);
             padding: 20px;
             border-radius: 10px;
-            margin-top: 20px;
+            margin-top: 0px;
             backdrop-filter: blur(10px);}
         .settings-group {
             margin-bottom: 20px;}
@@ -130,8 +127,9 @@
             color: #a8d8ff;
             font-style: italic;
             text-align: center;
-            margin-top: 15px;
+            margin-top: 2px;
             padding: 12px;
+            margin-bottom: 8px;
             background: rgba(168, 216, 255, 0.2);
             border-radius: 8px;
             font-size: clamp(14px, 3vw, 16px);}
@@ -210,28 +208,6 @@
                 <div id="angle2Error" class="error"></div>
             </div>
 
-            <div class="settings-group">
-                <label>Метод сумерек</label>
-                <div class="radio-group">
-                    <div class="radio-option">
-                        <input type="radio" id="method1" name="twilight" value="0">
-                        <label for="method1">0 - не считать (--:--:--)</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="method2" name="twilight" value="1" checked>
-                        <label for="method2">1 - сдвиг широты</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="method3" name="twilight" value="2">
-                        <label for="method3">2 - разделение 10 мин</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="method5" name="twilight" value="3">
-                        <label for="method5">3 - пропорциональный рассчет</label>
-                    </div>
-                </div>
-            </div>
-
             <div class="button-group">
                 <button class="save-btn" onclick="saveSettings()">Сохранить</button>
                 <button class="reset-btn" onclick="resetToDefault()">Сбросить</button>
@@ -240,11 +216,48 @@
     </div>
 
     <script>
+        /*
+------------------------
+     ⠄⠂⠂⢂⠨ 🔅 ⭑☽
+
+   Восход и заход Солнца 
+НЕВОЗМОЖНО ТОЧНО рассчит
+ать, из-за атмосферной р
+ефракции, высоты наблюда
+теля и рельефа местности
+  Расчетное время всегда
+будет иметь погрешность 
+до одной минуты и более!
+  За основу рассчетов вз
+ят алгоритм положения Со
+лнца USNO. Добавлен итер
+ативный подход для более
+точного определения эква
+ториальных координат. До
+бавлен учет атмосферной
+рефракции для усредненны
+х значений (1013.25 гПа,
+13*С) согласно Meeus 2го
+издания. Добавлена рассч
+ет белых ночей методом с
+двига широты к югу до бл
+ижайшего места где насту
+пает астрономическая ноч
+ь
+       -----------
+⠁⢀       Автор:
+  ⠄Пачкуля Пёстренький
+  ⠄   Благодарности:
+ ⠂       Тощег       ⠈
+   ⠄⠈ Чулик✶Тотощ ⡀ ⡁ ⠁
+
+
+        */
         // Константы для расчетов
         const months_short = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
         const namazlar = ['Фаджр', 'Восход', 'Зухр', 'Аср', 'Магриб', 'Иша'];
         const prayerClasses = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
-        const no_night = "* - светлые ночи";
+        const no_night = "\"Белые ночи\" - абсолютная ночь не наступает, рассчет Фаджр и Иша произведен для ближайшего места где наступает ночь";
 
         // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
         function is_leap(y) {
@@ -412,13 +425,13 @@
             }
         }
 
-        function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
+        function calculate(latitude, longitude, ut, morning_twilight, evening_twilight) {
             try {
                 morning_twilight = Math.abs(morning_twilight);
                 evening_twilight = Math.abs(evening_twilight);
                 const [ra, dec, EqT, SD] = usno_sun(ut);
 
-                function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 15) {
+                function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 13) {
                     if (altitude_deg <= -1) return 0.0;
                     const P0 = 1010, T0 = 283.0;
                     let R_deg;
@@ -471,42 +484,11 @@
 
                 // Обработка белых ночей
                 if (t[6]) {
-                    if (white_nights_method === 1) {
-                        let adjusted_latitude = Math.acos(-Math.sin(morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
-                        adjusted_latitude -= 9e-8;
-                        latitude = adjusted_latitude;
-                        ff = Level(morning_twilight);
-                        ii = Level(evening_twilight);
-                    } else if (white_nights_method === 2) {
-                        let temp_morning = morning_twilight;
-                        let temp_evening = evening_twilight;
-                        let iterations = 0;
-                        const max_iterations = 1000;
-
-                        while (ff === false && iterations < max_iterations) {
-                            temp_morning += 0.0001;
-                            ff = Level(temp_morning);
-                            iterations++;
-                        }
-
-                        iterations = 0;
-                        while (ii === false && iterations < max_iterations) {
-                            temp_evening += 0.0001;
-                            ii = Level(temp_evening);
-                            iterations++;
-                        }
-
-                        if (Math.abs(ff - ii) < 10 / 60.0) {
-                            ff = 12 - 5 / 60;
-                            ii = -12 - 5 / 60;
-                        }
-                    } else if (white_nights_method === 3) {
-                        const divisor = 7;
-                        const night_long = (24 - t[2] + t[1]) / divisor;
-                        t[4] = t[0] - (t[0] - t[1] + night_long);
-                        t[5] = t[0] + (-t[0] + t[2] + night_long);
-                        return [t[4], t[1], t[0], t[3], t[2], t[5], t[6], t[7]];
-                    }
+                    let adjusted_latitude = Math.acos(-Math.sin(-morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
+                    adjusted_latitude -= 9e-8;
+                    latitude = adjusted_latitude;
+                    ff = Level(morning_twilight);
+                    ii = Level(evening_twilight);
                 }
                 t[4] = ff !== false ? t[0] - ff : false;
                 t[5] = ii !== false ? t[0] + ii : false;
@@ -517,9 +499,9 @@
             }
         }
 
-        function calc_plus(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method) {
+        function calc_plus(latitude, longitude, ut, morning_twilight, evening_twilight) {
             try {
-                const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight, white_nights_method);
+                const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight);
                 const r = [0, 0, 0, 0, 0, 0, false, false];
                 let last_p = null;
 
@@ -528,7 +510,7 @@
                         r[i] = false;
                         continue;
                     }
-                    last_p = calculate(latitude, longitude, ut + t[i] * 3600, morning_twilight, evening_twilight, white_nights_method);
+                    last_p = calculate(latitude, longitude, ut + t[i] * 3600, morning_twilight, evening_twilight);
                     r[i] = last_p[i];
                 }
                 r[6] = r[7] = last_p ? (last_p[6] && last_p[7]) : false;
@@ -540,26 +522,26 @@
         }
 
         // ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
-        function get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight, white_nights_method = 0) {
+        function get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight) {
             const lat = parseFloat(latitude);
             const lon = parseFloat(longitude);
             const tz = parseInt(time_zone, 10);
             const dst_num = parseInt(dst, 10);
             const morn_tw = parseFloat(morning_twilight);
             const even_tw = parseFloat(evening_twilight);
-            const wn_method = parseInt(white_nights_method, 10);
 
             if (isNaN(lat) || isNaN(lon) || isNaN(tz) || isNaN(dst_num) || 
-                isNaN(morn_tw) || isNaN(even_tw) || isNaN(wn_method)) {
+                isNaN(morn_tw) || isNaN(even_tw)) {
                 return {error: "Ошибка: неверные параметры расчета"};
             }
 
             try {
                 let ut = Date.now() / 1000;
                 ut = ut - (ut % 86400) + 12 * 3600;
+                //ut = dt2ut(2025,5,25)
 
-                const t = calc_plus(lat, lon, ut, morn_tw, even_tw, wn_method);
-                const p = calc_plus(lat, lon, ut + 86400, morn_tw, even_tw, wn_method);
+                const t = calc_plus(lat, lon, ut, morn_tw, even_tw);
+                const p = calc_plus(lat, lon, ut + 86400, morn_tw, even_tw);
 
                 const today_offset = tz + is_dst(ut, tz, dst_num);
                 const tomorrow_offset = tz + is_dst(ut + 86400, tz, dst_num);
@@ -582,10 +564,6 @@
                     let isWhiteNight = false;
                     if (t[6]) {
                         if (i === 0 || i === 5) {
-                            if (wn_method === 0) {
-                                todayTime = "--:--:--";
-                                tomorrowTime = "--:--:--";
-                            }
                             isWhiteNight = true;
                             result.hasWhiteNights = true;
                         }
@@ -677,10 +655,7 @@
                 const dst = dst_element ? dst_element.value : "0";
                 const morning_twilight = document.getElementById('angle1').value;
                 const evening_twilight = document.getElementById('angle2').value;
-                const twilight_element = document.querySelector('input[name="twilight"]:checked');
-                const white_nights_method = twilight_element ? twilight_element.value : "0";
-
-                const result = get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight, white_nights_method);
+                const result = get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight);
 
                 if (result.error) {
                     document.getElementById('prayerTimesTable').innerHTML = `<div class="error">${result.error}</div>`;
@@ -740,7 +715,7 @@
             if (saved) {
                 try {
                     const settings = saved.split(';');
-                    if (settings.length >= 7) {
+                    if (settings.length >= 6) {
                         document.getElementById('latitude').value = settings[0] || '';
                         document.getElementById('longitude').value = settings[1] || '';
                         document.getElementById('timezone').value = settings[2] || '0';
@@ -751,11 +726,10 @@
                             document.getElementById('daylightNo').checked = true;
                         }
 
-                        document.getElementById('angle1').value = settings[4] || '-18';
-                        document.getElementById('angle2').value = settings[5] || '-17';
+                        document.getElementById('angle1').value = settings[4] || '18';
+                        document.getElementById('angle1').value = settings[4] || '18';
+                        document.getElementById('angle2').value = settings[5] || '17';
 
-                        const twilightValue = settings[6] || '1';
-                        document.querySelector(`input[name="twilight"][value="${twilightValue}"]`).checked = true;
                     }
                 } catch (e) {
                     console.error("Error loading settings:", e);
@@ -777,9 +751,8 @@
                 const daylight = document.querySelector('input[name="daylight"]:checked')?.value || '0';
                 const angle1 = document.getElementById('angle1').value;
                 const angle2 = document.getElementById('angle2').value;
-                const twilightMethod = document.querySelector('input[name="twilight"]:checked')?.value || '0';
 
-                const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2, twilightMethod].join(';');
+                const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2].join(';');
                 localStorage.setItem('astroSettings', settingsString);
 
                 document.getElementById('settingsPage').style.display = 'none';
@@ -797,10 +770,9 @@
                 document.getElementById('latitude').value = '';
                 document.getElementById('longitude').value = '';
                 document.getElementById('timezone').value = '0';
-                document.getElementById('daylightYes').checked = true;
+                document.getElementById('daylightNo').checked = true;
                 document.getElementById('angle1').value = '18';
                 document.getElementById('angle2').value = '17';
-                document.getElementById('method2').checked = true;
 
                 document.querySelectorAll('.error').forEach(el => el.textContent = '');
 
