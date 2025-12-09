@@ -510,7 +510,7 @@
                         r[i] = false;
                         continue;
                     }
-                    last_p = calculate(latitude, longitude, ut + t[i] * 3600, morning_twilight, evening_twilight);
+                    last_p = calculate(latitude, longitude, ut - 43200 + t[i] * 3600, morning_twilight, evening_twilight);
                     r[i] = last_p[i];
                 }
                 r[6] = r[7] = last_p ? (last_p[6] && last_p[7]) : false;
