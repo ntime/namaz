@@ -1,797 +1,1664 @@
+<!--
+------------------------
+    ⠄⠂⠂⢂⠨  ⭑☽   🔅
+
+  Восход и заход Солнца НЕВОЗМОЖНО ТОЧНО рассчитать, из-за
+атмосферной рефракции, высоты наблюдателя и рельефа местности.
+Расчетное время всегда будет иметь некоторое отклонение от
+фактического.
+  Автор постарался учесть все эти факторы по мере возможностей:
+  -для учета рефракции используй метеоданные.
+  -для учета высоты наблюдателя и рельефа нажмина "Просчитать
+с учетом рельефа" и смотрите время в окне ниже!
+
+  Ключевые особенности:
+
+- улучшенный алгоритм положения Солнца на базе USNO (добавлены 
+эффекты нутации, прецессии земнойоси, аберации света, улучшенный
+расчёт размеров солнечного диска)
+- итеративный расчёт координат Солнца
+- использование моделей атмосферной рефракции (Stellarium или 
+Meeus 2 издания) 
+- значения давления и температуры по умолчанию: 1013.25 гПа/13°С
+- метеоданные: https://api.open-meteo.com/v1/forecast/
+- геоданные: https://api.opentopodata.org/v1/
+- рассчет белых ночей методом сдвига широты к югу до ближайшего
+места где наступает астрономическая ночь
+- автоматический переходна летнее/зимнее время
+- рассчет горизонта с коррекцией атмосферной рефракции и 
+округлостью земной поверхности
+
+       ---------------
+
+⠁⢀          Автор:
+  ⠄   Пачкуля Пёстренький
+  ⠄       Благодарности:
+ ⠂           Тощег,        ⠈
+   ⠄⠈     Чулик,Тотощ   ⡀ ⡁ ⠁
+
+-->
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="ico_4.png">
-    <link rel="apple-touch-icon" href="ico_4.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="ico_4.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Намаз</title>
-    <style>
-        * { margin: 0;
-            padding: 0;
-            box-sizing: border-box;}
-        body {
-            font-family: Arial, sans-serif;
-            width: 100vw;
-            min-height: 100vh;
-            padding: 8px;
-            background: linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%);
-            color: white;}
-        .container {
-            max-width: 100%;
-            margin: 0 auto;}
-        .header {
-            text-align: center;
-            margin-bottom: 8px;
-            padding: 0px 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);}
-        .header h1 {
-            font-size: clamp(24px, 6vw, 32px);
-            margin-top: 0px;
-            margin-bottom: 0px;
-            background: linear-gradient(45deg, #fff, #a8d8ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;}
-        .date {
-            font-size: clamp(16px, 4vw, 20px);
-            opacity: 0.9;
-            margin-bottom: 5px;}
-        .time {
-            font-size: clamp(18px, 5vw, 24px);
-            font-weight: bold;
-            opacity: 0.9;}
-        .prayer-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 8px;
-            font-family: monospace;
-            font-size: clamp(16px, 4vw, 20px);
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);}
-        .prayer-table th, .prayer-table td {
-            padding: 16px 12px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);}
-        .prayer-table th {
-            background-color: rgba(255, 255, 255, 0.2);
-            font-weight: bold;
-            text-align: center;
-            font-size: clamp(14px, 3vw, 18px);}
-        /* Цвета для разных времен намаза */
-        .fajr {background: linear-gradient(90deg, rgba(25, 25, 112, 0.9) 0%, rgba(65, 105, 225, 0.7) 100%);}
-        .sunrise {background: linear-gradient(90deg, rgba(255, 140, 0, 0.9) 0%, rgba(255, 165, 0, 0.7) 100%);}
-        .dhuhr {background: linear-gradient(90deg, rgba(255, 215, 0, 0.9) 0%, rgba(255, 255, 0, 0.7) 100%);}
-        .asr {background: linear-gradient(90deg, rgba(255, 140, 0, 0.7) 0%, rgba(255, 69, 0, 0.5) 100%);}
-        .maghrib {background: linear-gradient(90deg, rgba(178, 34, 34, 0.9) 0%, rgba(255, 69, 0, 0.7) 100%);}
-        .isha {background: linear-gradient(90deg, rgba(25, 25, 112, 0.7) 0%, rgba(0, 0, 139, 0.9) 100%);}
-        button {
-            padding: 15px 25px;
-            font-size: clamp(16px, 4vw, 18px);
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s;}
-        button:active {
-            transform: scale(0.98);}
-        .settings-page {
-            display: none;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 0px;
-            backdrop-filter: blur(10px);}
-        .settings-group {
-            margin-bottom: 20px;}
-        .settings-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;}
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            margin: 5px 0;
-            border: none;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.9);
-            font-size: 16px;}
-        .radio-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 10px 0;}
-        .radio-option {
-            display: flex;
-            align-items: center;
-            margin-right: 15px;}
-        .save-btn {background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);}
-        .reset-btn {background: linear-gradient(135deg, #f44336 0%, #da190b 100%);}
-        .error {
-            color: #ff6b6b;
-            margin-top: 5px;
-            font-size: 14px;}
-        .white-night {
-            color: #a8d8ff;
-            font-style: italic;
-            text-align: center;
-            margin-top: 2px;
-            padding: 12px;
-            margin-bottom: 8px;
-            background: rgba(168, 216, 255, 0.2);
-            border-radius: 8px;
-            font-size: clamp(14px, 3vw, 16px);}
-        @media (min-width: 768px) {
-            .container {
-                max-width: 480px;}
-            .prayer-table {
-                font-size: 18px;}
-            button {
-                width: auto;
-                margin-top: 0;}
-            .button-group {
-                display: flex;
-                gap: 10px;}
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="ico_4.png">
+  <link rel="apple-touch-icon" href="ico_4.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="ico_4.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Намаз</title>
+  <style>
+    * { margin: 0;
+      padding: 0;
+      box-sizing: border-box;}
+    body {
+      font-family: Arial, sans-serif;
+      width: 100vw;
+      min-height: 100vh;
+      padding: 8px;
+      background: linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%);
+      color: white;}
+    .container {
+      max-width: 100%;
+      margin: 0 auto;}
+    .header {
+      text-align: center;
+      margin-bottom: 8px;
+      padding: 0px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);}
+    .header h1 {
+      font-size: clamp(24px, 6vw, 32px);
+      margin-top: 0px;
+      margin-bottom: 0px;
+      background: linear-gradient(45deg, #fff, #a8d8ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;}
+    .date {
+      font-size: clamp(16px, 4vw, 20px);
+      opacity: 0.9;
+      margin-bottom: 5px;}
+    .time {
+      font-size: clamp(18px, 5vw, 24px);
+      font-weight: bold;
+      opacity: 0.9;}
+    .prayer-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+      font-family: monospace;
+      font-size: clamp(16px, 4vw, 20px);
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);}
+    .prayer-table th, .prayer-table td {
+      padding: 16px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);}
+    .prayer-table th {
+      background-color: rgba(255, 255, 255, 0.2);
+      font-weight: bold;
+      text-align: center;
+      font-size: clamp(14px, 3vw, 18px);}
+    /* Цвета для разных времен намаза */
+    .fajr {background: linear-gradient(90deg, rgba(25, 25, 112, 0.9) 0%, rgba(65, 105, 225, 0.7) 100%);}
+    .sunrise {background: linear-gradient(90deg, rgba(255, 140, 0, 0.9) 0%, rgba(255, 165, 0, 0.7) 100%);}
+    .dhuhr {background: linear-gradient(90deg, rgba(255, 215, 0, 0.9) 0%, rgba(255, 255, 0, 0.7) 100%);}
+    .asr {background: linear-gradient(90deg, rgba(255, 140, 0, 0.7) 0%, rgba(255, 69, 0, 0.5) 100%);}
+    .maghrib {background: linear-gradient(90deg, rgba(178, 34, 34, 0.9) 0%, rgba(255, 69, 0, 0.7) 100%);}
+    .isha {background: linear-gradient(90deg, rgba(25, 25, 112, 0.7) 0%, rgba(0, 0, 139, 0.9) 100%);}
+    button {
+      padding: 15px 25px;
+      font-size: clamp(16px, 4vw, 18px);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s;}
+    button:active {
+      transform: scale(0.98);}
+    .settings-page {
+      display: none;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 0px;
+      backdrop-filter: blur(10px);}
+    .settings-group {
+      margin-bottom: 20px;}
+    .settings-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;}
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin: 5px 0;
+      border: none;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 16px;}
+    .radio-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0;}
+    .radio-option {
+      display: flex;
+      align-items: center;
+      margin-right: 15px;}
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;}
+    .save-btn {background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);}
+    .reset-btn {background: linear-gradient(135deg, #f44336 0%, #da190b 100%);}
+    .error {
+      color: #ff6b6b;
+      margin-top: 5px;
+      font-size: 14px;}
+    .white-night {
+      color: #a8d8ff;
+      font-style: italic;
+      text-align: center;
+      margin-top: 2px;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: rgba(168, 216, 255, 0.2);
+      border-radius: 8px;
+      font-size: clamp(14px, 3vw, 16px);}
+    .relief-result {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre; /* pre-wrap */
+      word-break: keep-all; /* break-all */
+      max-height: 600px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border-radius: 5px;
+      display: none;}
+    @media (min-width: 768px) {
+      .container {
+        max-width: 480px;}
+      .prayer-table {
+        font-size: 18px;}
+      button {
+        width: auto;
+        margin-top: 0;}
+      .button-group {
+        display: flex;
+        gap: 10px;}
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Главная страница -->
-        <div id="mainPage">
-            <div class="header">
-                <h1>Время намазов</h1>
-                <div class="date" id="currentDate"></div>
-                <div class="time" id="currentTime"></div>
-            </div>
-            <div id="prayerTimesTable"></div>
-            <div class="button-group">
-                <button onclick="showSettings()">Настройки</button>
-            </div>
-        </div>
-
-        <!-- Страница настроек -->
-        <div id="settingsPage" class="settings-page">
-            <div class="settings-group">
-                <label>Широта</label>
-                <input type="text" id="latitude" placeholder="Например: 55.7558">
-                <div id="latitudeError" class="error"></div>
-            </div>
-
-            <div class="settings-group">
-                <label>Долгота</label>
-                <input type="text" id="longitude" placeholder="Например: 37.6173">
-                <div id="longitudeError" class="error"></div>
-            </div>
-
-            <div class="settings-group">
-                <label>Часовой пояс</label>
-                <input type="text" id="timezone" value="0">
-                <div id="timezoneError" class="error"></div>
-            </div>
-
-            <div class="settings-group">
-                <label>Переводится ли время на летнее/зимнее</label>
-                <div class="radio-group">
-                    <div class="radio-option">
-                        <input type="radio" id="daylightYes" name="daylight" value="1">
-                        <label for="daylightYes">Да</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="daylightNo" name="daylight" value="0" checked>
-                        <label for="daylightNo">Нет</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="settings-group">
-                <label>Угол 1 (утренние сумерки)</label>
-                <input type="text" id="angle1" value="18">
-                <div id="angle1Error" class="error"></div>
-            </div>
-
-            <div class="settings-group">
-                <label>Угол 2 (вечерние сумерки)</label>
-                <input type="text" id="angle2" value="17">
-                <div id="angle2Error" class="error"></div>
-            </div>
-
-            <div class="button-group">
-                <button class="save-btn" onclick="saveSettings()">Сохранить</button>
-                <button class="reset-btn" onclick="resetToDefault()">Сбросить</button>
-            </div>
-        </div>
+  <div class="container">
+    <!-- Главная страница -->
+    <div id="mainPage">
+      <div class="header">
+        <h1>Время намазов</h1>
+        <div class="date" id="currentDate"></div>
+        <div class="time" id="currentTime"></div>
+      </div>
+      <div id="prayerTimesTable"></div>
+      <div class="button-group">
+        <button onclick="showSettings()">Настройки</button>
+        <button onclick="calculateRelief()">Просчитать восход/заход с учетом рельефа</button>
+      </div>
+      <div id="reliefResult" class="relief-result"></div>
     </div>
 
-    <script>
-        /*
-------------------------
-     ⠄⠂⠂⢂⠨ 🔅 ⭑☽
+    <!-- Страница настроек -->
+    <div id="settingsPage" class="settings-page">
+      <div class="settings-group">
+        <label>Широта</label>
+        <input type="text" id="latitude" placeholder="Например: 55.7558">
+        <div id="latitudeError" class="error"></div>
+      </div>
 
-   Восход и заход Солнца 
-НЕВОЗМОЖНО ТОЧНО рассчит
-ать, из-за атмосферной р
-ефракции, высоты наблюда
-теля и рельефа местности
-  Расчетное время всегда
-будет иметь погрешность 
-до одной минуты и более!
-  За основу рассчетов вз
-ят алгоритм положения Со
-лнца USNO. Добавлен итер
-ативный подход для более
-точного определения эква
-ториальных координат. До
-бавлен учет атмосферной
-рефракции для усредненны
-х значений (1013.25 гПа,
-13*С) согласно Meeus 2го
-издания. Добавлена рассч
-ет белых ночей методом с
-двига широты к югу до бл
-ижайшего места где насту
-пает астрономическая ноч
-ь
-       -----------
-⠁⢀       Автор:
-  ⠄Пачкуля Пёстренький
-  ⠄   Благодарности:
- ⠂       Тощег       ⠈
-   ⠄⠈ Чулик✶Тотощ ⡀ ⡁ ⠁
+      <div class="settings-group">
+        <label>Долгота</label>
+        <input type="text" id="longitude" placeholder="Например: 37.6173">
+        <div id="longitudeError" class="error"></div>
+      </div>
 
+      <div class="settings-group">
+        <label>Часовой пояс</label>
+        <input type="text" id="timezone" value="0">
+        <div id="timezoneError" class="error"></div>
+      </div>
 
-        */
-        // Константы для расчетов
-        const months_short = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
-        const namazlar = ['Фаджр', 'Восход', 'Зухр', 'Аср', 'Магриб', 'Иша'];
-        const prayerClasses = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
-        const no_night = "\"Белые ночи\" - абсолютная ночь не наступает, рассчет Фаджр и Иша произведен для ближайшего места где наступает ночь";
+      <div class="settings-group">
+        <label>Переводится ли время на летнее/зимнее</label>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="daylightYes" name="daylight" value="1">
+            <label for="daylightYes">Да</label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="daylightNo" name="daylight" value="0" checked>
+            <label for="daylightNo">Нет</label>
+          </div>
+        </div>
+      </div>
 
-        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-        function is_leap(y) {
-            return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+      <div class="settings-group">
+        <label>Угол 1 (утренние сумерки)</label>
+        <input type="text" id="angle1" value="18">
+        <div id="angle1Error" class="error"></div>
+      </div>
+
+      <div class="settings-group">
+        <label>Угол 2 (вечерние сумерки)</label>
+        <input type="text" id="angle2" value="17">
+        <div id="angle2Error" class="error"></div>
+      </div>
+
+      <div class="settings-group">
+        <div class="checkbox-option">
+          <input type="checkbox" id="useWeather" name="useWeather">
+          <label for="useWeather">Использовать метеоданные (температуру и давление) для более точного определения восходов и заходов</label>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="save-btn" onclick="saveSettings()">Сохранить</button>
+        <button class="reset-btn" onclick="resetToDefault()">Сбросить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Константы для расчетов
+    const months_short = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
+    const months_long = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
+    const namazlar = ['Фаджр', 'Восход', 'Зухр', 'Аср', 'Магриб', 'Иша'];
+    const prayerClasses = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    const no_night = "\"Белые ночи\" - абсолютная ночь не наступает, рассчет Фаджр и Иша произведен для ближайшего места где наступает ночь";
+
+    // Глобальные переменные
+    let m_dttm = [];
+    let m_temp = [];
+    let m_pres = [];
+    let useWeatherData = false;
+    
+    // Переменные для отладки
+    let debugInfo = "";
+
+    // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+    function is_leap(y) {
+      return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+    }
+
+    function ut2dt(ut) {
+      ut = Math.round(ut);
+      let days = Math.floor(ut / 86400);
+      let seconds_remaining = ut % 86400;
+      let hours = Math.floor(seconds_remaining / 3600);
+      seconds_remaining %= 3600;
+      let minutes = Math.floor(seconds_remaining / 60);
+      let seconds = seconds_remaining % 60;
+      let year = 1970;
+
+      while (days >= (is_leap(year) ? 366 : 365)) {
+        days -= is_leap(year) ? 366 : 365;
+        year++;
+        if (year > 2100) break;
+      }
+
+      const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let month = 1;
+      for (let md of month_days) {
+        if (days < md) break;
+        days -= md;
+        month++;
+        if (month > 12) {
+          month = 1;
+          year++;
         }
-
-        function ut2dt(ut) {
-            ut = Math.round(ut);
-            let days = Math.floor(ut / 86400);
-            let seconds_remaining = ut % 86400;
-            let hours = Math.floor(seconds_remaining / 3600);
-            seconds_remaining %= 3600;
-            let minutes = Math.floor(seconds_remaining / 60);
-            let seconds = seconds_remaining % 60;
-            let year = 1970;
-
-            while (days >= (is_leap(year) ? 366 : 365)) {
-                days -= is_leap(year) ? 366 : 365;
-                year++;
-                if (year > 2100) break;
-            }
-
-            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            let month = 1;
-            for (let md of month_days) {
-                if (days < md) break;
-                days -= md;
-                month++;
-                if (month > 12) {
-                    month = 1;
-                    year++;
-                }
-            }
-            return [year, month, days + 1, hours, minutes, seconds];
-        }
-
-        function dt2ut(year, month, day, hour = 0, minute = 0, second = 0) {
-            if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31) {
-                return 0;
-            }
-
-            let days = 0;
-            for (let y = 1970; y < year; y++) {
-                days += is_leap(y) ? 366 : 365;
-            }
-
-            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            for (let m = 0; m < month - 1; m++) {
-                days += month_days[m];
-            }
-            days += day - 1;
-            return days * 86400 + hour * 3600 + minute * 60 + second;
-        }
-
-        function get_weekday(year, month, day) {
-            if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
-
-            let m = month;
-            let y = year;
-            if (m < 3) {
-                m += 12;
-                y -= 1;
-            }
-            let k = y % 100;
-            let j = Math.floor(y / 100);
-            let h = (day + Math.floor(13 * (m + 1) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) + 5 * j) % 7;
-            let r = (h + 6) % 7;
-            return r;
-        }
-
-        function get_last_sunday(year, month, hour, minute, second, time_zone) {
-            const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            if (month < 1 || month > 12) return 0;
-
-            const last_day = month_days[month - 1];
-            const last_weekday = get_weekday(year, month, last_day);
-            const last_sunday_day = last_day - last_weekday;
-            const ut = dt2ut(year, month, last_sunday_day, hour, minute, second);
-            return ut - time_zone * 3600;
-        }
-
-        function is_dst(ut, time_zone, dst) {
-            const dst_num = parseInt(dst, 10);
-            if (dst_num === 0) {
-                return 0;
-            }
-
-            try {
-                const [year, month, day, hour, minute, second] = ut2dt(ut);
-                const dst_start = get_last_sunday(year, 3, 2, 0, 0, time_zone);
-                const dst_end = get_last_sunday(year, 10, 2, 0, 0, time_zone);
-                const r = (dst_start <= ut && ut < dst_end) ? 1 : 0;
-                return r;
-            } catch (e) {
-                console.error("Error in is_dst:", e);
-                return 0;
-            }
-        }
-
-        function normalize(value, base) {
-            if (base === 0) return value;
-            return value - base * Math.floor(value / base);
-        }
-
-        function f_to_hms(hh) {
-            if (isNaN(hh) || !isFinite(hh)) {
-                return [0, 0, 0];
-            }
-
-            let hours = Math.floor(hh);
-            let minutes = (hh - hours) * 60;
-            let min_int = Math.floor(minutes);
-            let seconds = (minutes - min_int) * 60;
-            let sec_int = Math.round(seconds);
-
-            if (sec_int >= 60) {
-                sec_int = 0;
-                min_int += 1;
-            }
-            if (min_int >= 60) {
-                min_int = 0;
-                hours += 1;
-            }
-            if (hours >= 24) {
-                hours -= 24;
-            }
-            return [hours, min_int, sec_int];
-        }
-
-        function f_to_hms_str(hours_decimal) {
-            if (isNaN(hours_decimal) || !isFinite(hours_decimal)) {
-                return "--:--:--";
-            }
-
-            hours_decimal = normalize(hours_decimal, 24);
-            const [h, m, s] = f_to_hms(Math.abs(hours_decimal));
-            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-
-        // ==================== АСТРОНОМИЧЕСКИЕ РАСЧЕТЫ ====================
-        function calc_jd(ut) {
-            return 2440587.5 + (ut / 86400.0);
-        }
-
-        function usno_sun(ut) {
-            try {
-                const jd = calc_jd(ut);
-                const D = jd - 2451545.0;
-                let g = normalize(357.5291092 + 0.985600274 * D, 360);
-                let q = normalize(280.4664567 + 0.985647366286 * D, 360);
-                let L = normalize(q + 1.915 * Math.sin(g * Math.PI / 180) + 0.020 * Math.sin(2 * g * Math.PI / 180), 360);
-                let e = normalize(23.439 - 0.00000036 * D, 360);
-                e = normalize(e + 0.00256 * Math.cos((125.04 - 1934.136 * D / 36525) * Math.PI / 180), 360);
-                let ra = Math.atan2(Math.cos(e * Math.PI / 180) * Math.sin(L * Math.PI / 180), Math.cos(L * Math.PI / 180)) * 180 / Math.PI;
-                const dec = Math.asin(Math.sin(e * Math.PI / 180) * Math.sin(L * Math.PI / 180)) * 180 / Math.PI;
-                if (ra < 0) ra += 360;
-                const EqT = (q - ra) / 15.0;
-                ra /= 15.0;
-                const R = 1.00014 - 0.01671 * Math.cos(g * Math.PI / 180) - 0.00014 * Math.cos(2 * g * Math.PI / 180);
-                const SD = 0.26656 / R;
-                return [ra, dec, EqT, SD];
-            } catch (e) {
-                console.error("Error in usno_sun:", e);
-                return [0, 0, 0, 0];
-            }
-        }
-
-        function calculate(latitude, longitude, ut, morning_twilight, evening_twilight) {
-            try {
-                morning_twilight = Math.abs(morning_twilight);
-                evening_twilight = Math.abs(evening_twilight);
-                const [ra, dec, EqT, SD] = usno_sun(ut);
-
-                function meeus_refraction(altitude_deg, pressure = 1013.25, temperature = 13) {
-                    if (altitude_deg <= -1) return 0.0;
-                    const P0 = 1010, T0 = 283.0;
-                    let R_deg;
-
-                    if (altitude_deg > 15) {
-                        const z = 90.0 - altitude_deg;
-                        const tan_z = Math.tan(z * Math.PI / 180);
-                        const R_arcsec = 58.276 * tan_z - 0.0824 * Math.pow(tan_z, 3);
-                        R_deg = R_arcsec / 3600.0;
-                    } else {
-                        const R_arcmin = 1.0 / Math.tan((altitude_deg + 7.31 / (altitude_deg + 4.4)) * Math.PI / 180);
-                        R_deg = R_arcmin / 60.0;
-                    }
-                    return R_deg * (pressure / P0) * (T0 / (273.0 + temperature));
-                }
-
-                function Level(angle) {
-                    if (isNaN(angle)) return false;
-
-                    const numerator = Math.sin(-angle * Math.PI / 180) - Math.sin(dec * Math.PI / 180) * Math.sin(latitude * Math.PI / 180);
-                    const denominator = Math.cos(dec * Math.PI / 180) * Math.cos(latitude * Math.PI / 180);
-
-                    if (Math.abs(denominator) < 1e-10 || Math.abs(numerator) > Math.abs(denominator)) {
-                        return false;
-                    }
-
-                    const cos_val = numerator / denominator;
-                    if (Math.abs(cos_val) > 1) return false;
-
-                    return Math.acos(cos_val) * 180 / Math.PI / 15;
-                }
-
-                const t = [0, 0, 0, 0, 0, 0, 0, 0];
-                t[0] = 12 - longitude / 15.0 - EqT;
-
-                const angle = SD + meeus_refraction(0);
-                const lvl_val = Level(angle);
-                t[1] = lvl_val !== false ? t[0] - lvl_val : false;
-                t[2] = lvl_val !== false ? t[0] + lvl_val : false;
-
-                const asr_angle = Math.atan(1.0 / (1.0 + Math.tan(Math.abs(latitude - dec) * Math.PI / 180))) * 180 / Math.PI;
-                const asr_angle_corr = asr_angle - meeus_refraction(asr_angle);
-                const asr_level = Level(-asr_angle_corr);
-                t[3] = asr_level !== false ? t[0] + asr_level : false;
-
-                let ff = Level(morning_twilight);
-                let ii = Level(evening_twilight);
-                t[6] = (ff === false) || (ii === false);
-                t[7] = t[6];
-
-                // Обработка белых ночей
-                if (t[6]) {
-                    let adjusted_latitude = Math.acos(-Math.sin(-morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
-                    adjusted_latitude -= 9e-8;
-                    latitude = adjusted_latitude;
-                    ff = Level(morning_twilight);
-                    ii = Level(evening_twilight);
-                }
-                t[4] = ff !== false ? t[0] - ff : false;
-                t[5] = ii !== false ? t[0] + ii : false;
-                return [t[4], t[1], t[0], t[3], t[2], t[5], t[6], t[7]];
-            } catch (e) {
-                console.error("Error in calculate:", e);
-                return [false, false, false, false, false, false, false, false];
-            }
-        }
-
-        function calc_plus(latitude, longitude, ut, morning_twilight, evening_twilight) {
-            try {
-                const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight);
-                const r = [0, 0, 0, 0, 0, 0, false, false];
-                let last_p = null;
-
-                for (let i = 0; i < 6; i++) {
-                    if (t[i] === false) {
-                        r[i] = false;
-                        continue;
-                    }
-                    last_p = calculate(latitude, longitude, ut - 43200 + t[i] * 3600, morning_twilight, evening_twilight);
-                    r[i] = last_p[i];
-                }
-                r[6] = r[7] = last_p ? (last_p[6] && last_p[7]) : false;
-                return r;
-            } catch (e) {
-                console.error("Error in calc_plus:", e);
-                return [false, false, false, false, false, false, false, false];
-            }
-        }
-
-        // ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
-        function get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight) {
-            const lat = parseFloat(latitude);
-            const lon = parseFloat(longitude);
-            const tz = parseInt(time_zone, 10);
-            const dst_num = parseInt(dst, 10);
-            const morn_tw = parseFloat(morning_twilight);
-            const even_tw = parseFloat(evening_twilight);
-
-            if (isNaN(lat) || isNaN(lon) || isNaN(tz) || isNaN(dst_num) || 
-                isNaN(morn_tw) || isNaN(even_tw)) {
-                return {error: "Ошибка: неверные параметры расчета"};
-            }
-
-            try {
-                let ut = Date.now() / 1000;
-                ut = ut - (ut % 86400) + 12 * 3600;
-                //ut = dt2ut(2025,5,25)
-
-                const t = calc_plus(lat, lon, ut, morn_tw, even_tw);
-                const p = calc_plus(lat, lon, ut + 86400, morn_tw, even_tw);
-
-                const today_offset = tz + is_dst(ut, tz, dst_num);
-                const tomorrow_offset = tz + is_dst(ut + 86400, tz, dst_num);
-
-                const [_, month, day, __, ___, ____] = ut2dt(ut + today_offset * 3600);
-
-                const result = {
-                    date: `${day.toString().padStart(2, '0')} ${months_short[month - 1]}`,
-                    times: [],
-                    hasWhiteNights: false
-                };
-
-                for (let i = 0; i < 6; i++) {
-                    const tt_offset = tz + is_dst(ut + t[i] * 3600.0, tz, dst_num);
-                    const tp_offset = tz + is_dst(ut + p[i] * 3600.0 + 86400, tz, dst_num);
-
-                    let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
-                    let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
-
-                    let isWhiteNight = false;
-                    if (t[6]) {
-                        if (i === 0 || i === 5) {
-                            isWhiteNight = true;
-                            result.hasWhiteNights = true;
-                        }
-                    }
-
-                    result.times.push({
-                        name: namazlar[i],
-                        today: todayTime,
-                        tomorrow: tomorrowTime,
-                        isWhiteNight: isWhiteNight,
-                        class: prayerClasses[i]
-                    });
-                }
-
-                return result;
-            } catch (e) {
-                console.error("Error in get_today:", e);
-                return {error: "Ошибка расчета времени намазов"};
-            }
-        }
-
-        function validateInputs() {
-            let isValid = true;
-
-            document.querySelectorAll('.error').forEach(el => el.textContent = '');
-
-            const latitude = parseFloat(document.getElementById('latitude').value);
-            if (isNaN(latitude) || latitude < -90 || latitude > 90) {
-                document.getElementById('latitudeError').textContent = 'Широта должна быть числом от -90 до 90';
-                isValid = false;
-            }
-
-            const longitude = parseFloat(document.getElementById('longitude').value);
-            if (isNaN(longitude) || longitude < -180 || longitude > 180) {
-                document.getElementById('longitudeError').textContent = 'Долгота должна быть числом от -180 до 180';
-                isValid = false;
-            }
-
-            const timezone = parseFloat(document.getElementById('timezone').value);
-            if (isNaN(timezone) || timezone < -12 || timezone > 14) {
-                document.getElementById('timezoneError').textContent = 'Часовой пояс должен быть числом от -12 до 14';
-                isValid = false;
-            }
-
-            const angle1 = parseFloat(document.getElementById('angle1').value);
-            if (isNaN(angle1) || angle1 < -90 || angle1 > 90) {
-                document.getElementById('angle1Error').textContent = 'Угол 1 должен быть числом от -90 до 90';
-                isValid = false;
-            }
-
-            const angle2 = parseFloat(document.getElementById('angle2').value);
-            if (isNaN(angle2) || angle2 < -90 || angle2 > 90) {
-                document.getElementById('angle2Error').textContent = 'Угол 2 должен быть числом от -90 до 90';
-                isValid = false;
-            }
-
-            return isValid;
-        }
-
-        function updateCurrentDateTime() {
-            const now = new Date();
-            const dateOptions = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric'
-            };
-            const timeOptions = {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            };
-
-            document.getElementById('currentDate').textContent = now.toLocaleDateString('ru-RU', dateOptions);
-            document.getElementById('currentTime').textContent = now.toLocaleTimeString('ru-RU', timeOptions);
-        }
-
-        function updatePrayerTimes() {
-            if (!validateInputs()) {
-                document.getElementById('prayerTimesTable').innerHTML = '<div class="error">Пожалуйста, исправьте ошибки в настройках</div>';
-                return;
-            }
-
-            try {
-                const latitude = document.getElementById('latitude').value;
-                const longitude = document.getElementById('longitude').value;
-                const time_zone = document.getElementById('timezone').value;
-                const dst_element = document.querySelector('input[name="daylight"]:checked');
-                const dst = dst_element ? dst_element.value : "0";
-                const morning_twilight = document.getElementById('angle1').value;
-                const evening_twilight = document.getElementById('angle2').value;
-                const result = get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight);
-
-                if (result.error) {
-                    document.getElementById('prayerTimesTable').innerHTML = `<div class="error">${result.error}</div>`;
-                    return;
-                }
-
-                let tableHTML = `
-                    <table class="prayer-table">
-                        <thead>
-                            <tr>
-                                <th>Намаз</th>
-                                <th>Сегодня (${result.date})</th>
-                                <th>Завтра</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                result.times.forEach(prayer => {
-                    const todayClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
-                    const tomorrowClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
-
-                    tableHTML += `
-                        <tr>
-                            <td>${prayer.name}</td>
-                            <td class="${todayClass}">${prayer.today}</td>
-                            <td class="${tomorrowClass}">${prayer.tomorrow}</td>
-                        </tr>
-                    `;
-                });
-
-                tableHTML += `
-                        </tbody>
-                    </table>
-                `;
-
-                if (result.hasWhiteNights) {
-                    tableHTML += `<div class="white-night">${no_night}</div>`;
-                }
-
-                document.getElementById('prayerTimesTable').innerHTML = tableHTML;
-
-            } catch (e) {
-                console.error("Error in updatePrayerTimes:", e);
-                document.getElementById('prayerTimesTable').innerHTML = '<div class="error">Ошибка при расчете времени намазов</div>';
-            }
-        }
-
-        function showSettings() {
-            document.getElementById('mainPage').style.display = 'none';
-            document.getElementById('settingsPage').style.display = 'block';
-            loadSettings();
-        }
-
-        function loadSettings() {
-            const saved = localStorage.getItem('astroSettings');
-            if (saved) {
-                try {
-                    const settings = saved.split(';');
-                    if (settings.length >= 6) {
-                        document.getElementById('latitude').value = settings[0] || '';
-                        document.getElementById('longitude').value = settings[1] || '';
-                        document.getElementById('timezone').value = settings[2] || '0';
-
-                        if (settings[3] === '1') {
-                            document.getElementById('daylightYes').checked = true;
-                        } else {
-                            document.getElementById('daylightNo').checked = true;
-                        }
-
-                        document.getElementById('angle1').value = settings[4] || '18';
-                        document.getElementById('angle1').value = settings[4] || '18';
-                        document.getElementById('angle2').value = settings[5] || '17';
-
-                    }
-                } catch (e) {
-                    console.error("Error loading settings:", e);
-                }
-            }
-            updateCurrentDateTime();
-            updatePrayerTimes();
-        }
-
-        function saveSettings() {
-            if (!validateInputs()) {
-                return;
-            }
-
-            try {
-                const latitude = document.getElementById('latitude').value;
-                const longitude = document.getElementById('longitude').value;
-                const timezone = document.getElementById('timezone').value;
-                const daylight = document.querySelector('input[name="daylight"]:checked')?.value || '0';
-                const angle1 = document.getElementById('angle1').value;
-                const angle2 = document.getElementById('angle2').value;
-
-                const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2].join(';');
-                localStorage.setItem('astroSettings', settingsString);
-
-                document.getElementById('settingsPage').style.display = 'none';
-                document.getElementById('mainPage').style.display = 'block';
-                updateCurrentDateTime();
-                updatePrayerTimes();
-            } catch (e) {
-                console.error("Error saving settings:", e);
-                alert("Ошибка при сохранении настроек");
-            }
-        }
-
-        function resetToDefault() {
-            if (confirm("Вы уверены, что хотите сбросить настройки к значениям по умолчанию?")) {
-                document.getElementById('latitude').value = '';
-                document.getElementById('longitude').value = '';
-                document.getElementById('timezone').value = '0';
-                document.getElementById('daylightNo').checked = true;
-                document.getElementById('angle1').value = '18';
-                document.getElementById('angle2').value = '17';
-
-                document.querySelectorAll('.error').forEach(el => el.textContent = '');
-
-                localStorage.removeItem('astroSettings');
-                updateCurrentDateTime();
-                updatePrayerTimes();
-            }
-        }
-
-        // Инициализация при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('mainPage').style.display = 'block';
-            document.getElementById('settingsPage').style.display = 'none';
-            updateCurrentDateTime();
-            loadSettings();
-
-            setInterval(updateCurrentDateTime, 1000);
-            setInterval(updatePrayerTimes, 30000);
+      }
+      return [year, month, days + 1, hours, minutes, seconds];
+    }
+
+    function dt2ut(year, month, day, hour = 0, minute = 0, second = 0) {
+      if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31) {
+        return 0;
+      }
+
+      let days = 0;
+      for (let y = 1970; y < year; y++) {
+        days += is_leap(y) ? 366 : 365;
+      }
+
+      const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      for (let m = 0; m < month - 1; m++) {
+        days += month_days[m];
+      }
+      days += day - 1;
+      return days * 86400 + hour * 3600 + minute * 60 + second;
+    }
+
+    function get_weekday(year, month, day) {
+      if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
+
+      let m = month;
+      let y = year;
+      if (m < 3) {
+        m += 12;
+        y -= 1;
+      }
+      let k = y % 100;
+      let j = Math.floor(y / 100);
+      let h = (day + Math.floor(13 * (m + 1) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) + 5 * j) % 7;
+      let r = (h + 6) % 7;
+      return r;
+    }
+
+    function get_last_sunday(year, month, hour, minute, second, time_zone) {
+      const month_days = [31, 28 + (is_leap(year) ? 1 : 0), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      if (month < 1 || month > 12) return 0;
+
+      const last_day = month_days[month - 1];
+      const last_weekday = get_weekday(year, month, last_day);
+      const last_sunday_day = last_day - last_weekday;
+      const ut = dt2ut(year, month, last_sunday_day, hour, minute, second);
+      return ut - time_zone * 3600;
+    }
+
+    function is_dst(ut, time_zone, dst) {
+      const dst_num = parseInt(dst, 10);
+      if (dst_num === 0) {
+        return 0;
+      }
+
+      try {
+        const [year, month, day, hour, minute, second] = ut2dt(ut);
+        const dst_start = get_last_sunday(year, 3, 2, 0, 0, time_zone);
+        const dst_end = get_last_sunday(year, 10, 2, 0, 0, time_zone);
+        const r = (dst_start <= ut && ut < dst_end) ? 1 : 0;
+        return r;
+      } catch (e) {
+        console.error("Error in is_dst:", e);
+        return 0;
+      }
+    }
+
+    function normalize(value, base) {
+      if (base === 0) return value;
+      return value - base * Math.floor(value / base);
+    }
+
+    function f_to_hms(hh) {
+      if (isNaN(hh) || !isFinite(hh)) {
+        return [0, 0, 0];
+      }
+
+      let hours = Math.floor(hh);
+      let minutes = (hh - hours) * 60;
+      let min_int = Math.floor(minutes);
+      let seconds = (minutes - min_int) * 60;
+      let sec_int = Math.round(seconds);
+
+      if (sec_int >= 60) {
+        sec_int = 0;
+        min_int += 1;
+      }
+      if (min_int >= 60) {
+        min_int = 0;
+        hours += 1;
+      }
+      if (hours >= 24) {
+        hours -= 24;
+      }
+      return [hours, min_int, sec_int];
+    }
+
+    function f_to_hms_str(hours_decimal) {
+      if (isNaN(hours_decimal) || !isFinite(hours_decimal)) {
+        return "--:--:--";
+      }
+
+      hours_decimal = normalize(hours_decimal, 24);
+      const [h, m, s] = f_to_hms(Math.abs(hours_decimal));
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function get_ut(timeString) {
+      const year = parseInt(timeString.substring(0, 4));
+      const month = parseInt(timeString.substring(5, 7));
+      const day = parseInt(timeString.substring(8, 10));
+      const hour = parseInt(timeString.substring(11, 13));
+      return dt2ut(year, month, day, hour);
+    }
+
+    // ==================== ПОГОДНЫЙ API ====================
+    async function get_weather_forecast(lat, lon) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,pressure_msl&timezone=auto&forecast_days=2`;
+      
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
+          }
         });
-    </script>
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error("Ошибка запроса погоды:", error);
+        return null;
+      }
+    }
+
+    // ==================== АСТРОНОМИЧЕСКИЕ РАСЧЕТЫ ====================
+    function calc_jd(ut) {
+      return 2440587.5 + (ut / 86400.0);
+    }
+
+    function usno_sun(ut) {
+      try {
+        const jd = calc_jd(ut);
+        const D = jd - 2451545.0;
+        let g = normalize(357.5291092 + 0.985600274 * D, 360);
+        let q = normalize(280.4664567 + 0.985647366286 * D, 360);
+        let L = normalize(q + 1.915 * Math.sin(g * Math.PI / 180) + 0.020 * Math.sin(2 * g * Math.PI / 180), 360);
+        let e = normalize(23.439 - 0.00000036 * D, 360);
+        e = normalize(e + 0.00256 * Math.cos((125.04 - 1934.136 * D / 36525) * Math.PI / 180), 360);
+        let ra = Math.atan2(Math.cos(e * Math.PI / 180) * Math.sin(L * Math.PI / 180), Math.cos(L * Math.PI / 180)) * 180 / Math.PI;
+        const dec = Math.asin(Math.sin(e * Math.PI / 180) * Math.sin(L * Math.PI / 180)) * 180 / Math.PI;
+        if (ra < 0) ra += 360;
+        const EqT = (q - ra) / 15.0;
+        ra /= 15.0;
+        const R = 1.00014 - 0.01671 * Math.cos(g * Math.PI / 180) - 0.00014 * Math.cos(2 * g * Math.PI / 180);
+        const SD = 0.26656 / R;
+        return [ra, dec, EqT, SD];
+      } catch (e) {
+        console.error("Error in usno_sun:", e);
+        return [0, 0, 0, 0];
+      }
+    }
+
+    function stellarium_refraction(geom_alt_deg, pressure = 1013.25, temperature = 15) {
+      const MIN_GEO_ALTITUDE_DEG = -3.54;
+      const TRANSITION_WIDTH_GEO_DEG = 1.46;
+      
+      const press_temp_corr = (pressure / 1010.0) * (283.0 / (273.0 + temperature)) / 60.0;
+      let refraction_deg = 0.0;
+      
+      if (geom_alt_deg > MIN_GEO_ALTITUDE_DEG) {
+        refraction_deg = press_temp_corr * (1.02 / Math.tan(
+          (geom_alt_deg + 10.3 / (geom_alt_deg + 5.11)) * Math.PI / 180) + 0.0019279);
+        
+        const apparent_alt_deg = geom_alt_deg + refraction_deg;
+        if (apparent_alt_deg > 90.0) {
+          refraction_deg = 90.0 - geom_alt_deg;
+        }
+      } else if (geom_alt_deg > MIN_GEO_ALTITUDE_DEG - TRANSITION_WIDTH_GEO_DEG) {
+        const r_m5 = press_temp_corr * (1.02 / Math.tan(
+          (MIN_GEO_ALTITUDE_DEG + 10.3 / (MIN_GEO_ALTITUDE_DEG + 5.11)) * Math.PI / 180) + 0.0019279);
+        const factor = (geom_alt_deg - (MIN_GEO_ALTITUDE_DEG - TRANSITION_WIDTH_GEO_DEG)) / TRANSITION_WIDTH_GEO_DEG;
+        refraction_deg = r_m5 * factor;
+      }
+      
+      return refraction_deg;
+    }
+
+    function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, 
+             pressure = 1013.25, temperature = 15, sunrise_angle = 0, sunset_angle = 0) {
+      try {
+        morning_twilight = Math.abs(morning_twilight);
+        evening_twilight = Math.abs(evening_twilight);
+        const [ra, dec, EqT, SD] = usno_sun(ut);
+
+        function Level(angle) {
+          if (isNaN(angle)) return false;
+
+          const numerator = Math.sin(-angle * Math.PI / 180) - Math.sin(dec * Math.PI / 180) * Math.sin(latitude * Math.PI / 180);
+          const denominator = Math.cos(dec * Math.PI / 180) * Math.cos(latitude * Math.PI / 180);
+
+          if (Math.abs(denominator) < 1e-10 || Math.abs(numerator) > Math.abs(denominator)) {
+            return false;
+          }
+
+          const cos_val = numerator / denominator;
+          if (Math.abs(cos_val) > 1) return false;
+
+          return Math.acos(cos_val) * 180 / Math.PI / 15;
+        }
+
+        const t = [0, 0, 0, 0, 0, 0, 0];
+        t[0] = 12 - longitude / 15.0 - EqT;
+
+        const angle = SD + stellarium_refraction(0, pressure, temperature) - sunrise_angle;
+        const lvl_val = Level(angle);
+        t[1] = lvl_val !== false ? t[0] - lvl_val : false;
+        
+        const angle2 = SD + stellarium_refraction(0, pressure, temperature) - sunset_angle;
+        const lvl_val2 = Level(angle2);
+        t[2] = lvl_val2 !== false ? t[0] + lvl_val2 : false;
+
+        const asr_angle = Math.atan(1.0 / (1.0 + Math.tan(Math.abs(latitude - dec) * Math.PI / 180))) * 180 / Math.PI;
+        const asr_angle_corr = asr_angle - stellarium_refraction(asr_angle, pressure, temperature);
+        const asr_level = Level(-asr_angle_corr);
+        t[3] = asr_level !== false ? t[0] + asr_level : false;
+
+        let ff = Level(morning_twilight);
+        let ii = Level(evening_twilight);
+        t[6] = (ff === false) || (ii === false);
+
+        if (t[6]) {
+          let adjusted_latitude = Math.acos(-Math.sin(-morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
+          adjusted_latitude -= 9e-8;
+          latitude = adjusted_latitude;
+          ff = Level(morning_twilight);
+          ii = Level(evening_twilight);
+        }
+        t[4] = ff !== false ? t[0] - ff : false;
+        t[5] = ii !== false ? t[0] + ii : false;
+        return [t[4], t[1], t[0], t[3], t[2], t[5], t[6]];
+      } catch (e) {
+        console.error("Error in calculate:", e);
+        return [false, false, false, false, false, false, false];
+      }
+    }
+
+    function calc_plus(latitude, longitude, ut, morning_twilight, evening_twilight, sunrise_angle = 0, sunset_angle = 0) {
+      try {
+        let n = 0;
+        if (m_dttm.length > 0) {
+          if (ut - m_dttm[0] === 43200) {
+            n = 0;
+          } else if (ut - m_dttm[0] === 129600) {
+            n = 24;
+          } else {
+            n = Math.floor((ut - m_dttm[0]) / 3600);
+          }
+        }
+        
+        const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight, 
+                 sunrise_angle, sunset_angle);
+        const r = [0, 0, 0, 0, 0, 0, false];
+        const c = [0, 0, 0, 0, 0, 0];
+
+        for (let i = 0; i < 6; i++) {
+          if (t[i] === false) {
+            r[i] = false;
+            continue;
+          }
+          r[i] = Math.round(t[i]);
+        }
+        
+        let last_p = null;
+        for (let i = 0; i < 6; i++) {
+          if (t[i] === false) {
+            r[i] = false;
+            continue;
+          }
+          
+          const pressure = m_pres.length > 0 ? m_pres[r[i] + n] : 1013.25;
+          const temperature = m_temp.length > 0 ? m_temp[r[i] + n] : 15;
+          
+          last_p = calculate(latitude, longitude, ut - 43200 + t[i] * 3600, 
+                   morning_twilight, evening_twilight, 
+                   pressure, temperature, sunrise_angle, sunset_angle);
+          c[i] = r[i] + n;
+          r[i] = last_p[i];
+        }
+        r[6] = last_p ? last_p[6] : false;
+        return [r, c];
+      } catch (e) {
+        console.error("Error in calc_plus:", e);
+        return [[false, false, false, false, false, false, false], [0, 0, 0, 0, 0, 0]];
+      }
+    }
+
+    // ==================== ФУНКЦИИ ДЛЯ РАСЧЕТА РЕЛЬЕФА ====================
+    function sun_az_alt(latitude, longitude, ut) {
+      const [ra, dec, EqT, SD] = usno_sun(ut);
+      const [year, month, day, hour, minute, second] = ut2dt(ut);
+      
+      const t0 = 12 - longitude / 15.0 - EqT;
+      const UT = hour + minute / 60 + second / 3600;
+      const H_deg = (UT - t0) * 15.0;
+      const H_rad = H_deg * Math.PI / 180;
+      
+      const fi = latitude * Math.PI / 180;
+      const delta = dec * Math.PI / 180;
+      let sin_h = Math.sin(fi) * Math.sin(delta) + Math.cos(fi) * Math.cos(delta) * Math.cos(H_rad);
+      sin_h = Math.max(-1.0, Math.min(1.0, sin_h));
+      const h = Math.asin(sin_h);
+      
+      let cos_A = (Math.sin(delta) - Math.sin(fi) * Math.sin(h)) / (Math.cos(fi) * Math.cos(h));
+      cos_A = Math.max(-1.0, Math.min(1.0, cos_A));
+      let A = Math.acos(cos_A);
+      
+      if (Math.sin(H_rad) > 0) {
+        A = 2 * Math.PI - A;
+      }
+      
+      let altitude_deg = h * 180 / Math.PI;
+      altitude_deg += stellarium_refraction(altitude_deg);
+      const azimuth_deg = A * 180 / Math.PI;
+      
+      return [azimuth_deg, altitude_deg];
+    }
+
+    function vincenty_direct(lat1, lon1, azi1, s) {
+      const a = 6378137.0;
+      const f = 1 / 298.257223563;
+      const b = a * (1 - f);
+      
+      const phi1 = lat1 * Math.PI / 180;
+      const lambda1 = lon1 * Math.PI / 180;
+      const alpha1 = azi1 * Math.PI / 180;
+      
+      const tanU1 = (1 - f) * Math.tan(phi1);
+      const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+      const sinU1 = tanU1 * cosU1;
+      const sin_alpha1 = Math.sin(alpha1);
+      const cos_alpha1 = Math.cos(alpha1);
+      
+      const sigma1 = Math.atan2(tanU1, cos_alpha1);
+      
+      const sin_alpha = cosU1 * sin_alpha1;
+      const cos2_alpha = 1 - sin_alpha * sin_alpha;
+      
+      let u2, A, B;
+      if (Math.abs(cos2_alpha) < 1e-20) {
+        u2 = 0.0;
+        A = 1.0;
+        B = 0.0;
+      } else {
+        u2 = cos2_alpha * (a * a - b * b) / (b * b);
+        A = 1 + u2 / 16384 * (4096 + u2 * (-768 + u2 * (320 - 175 * u2)));
+        B = u2 / 1024 * (256 + u2 * (-128 + u2 * (74 - 47 * u2)));
+      }
+      
+      let sigma = s / (b * A);
+      
+      for (let i = 0; i < 200; i++) {
+        const cos2_sigma_m = Math.cos(2 * sigma1 + sigma);
+        const sin_sigma = Math.sin(sigma);
+        const cos_sigma = Math.cos(sigma);
+        
+        const delta_sigma = B * sin_sigma * (cos2_sigma_m + B / 4 * (
+          cos_sigma * (-1 + 2 * cos2_sigma_m * cos2_sigma_m) -
+          B / 6 * cos2_sigma_m * (-3 + 4 * sin_sigma * sin_sigma) *
+          (-3 + 4 * cos2_sigma_m * cos2_sigma_m)
+        ));
+        
+        const sigma_prev = sigma;
+        sigma = s / (b * A) + delta_sigma;
+        
+        if (Math.abs(sigma - sigma_prev) < 1e-12) {
+          break;
+        }
+      }
+      
+      const cos2_sigma_m = Math.cos(2 * sigma1 + sigma);
+      const sin_sigma = Math.sin(sigma);
+      const cos_sigma = Math.cos(sigma);
+      
+      const phi2_num = sinU1 * cos_sigma + cosU1 * sin_sigma * cos_alpha1;
+      const phi2_den = (1 - f) * Math.sqrt(sin_alpha * sin_alpha +
+        Math.pow(sinU1 * sin_sigma - cosU1 * cos_sigma * cos_alpha1, 2));
+      const phi2 = Math.atan2(phi2_num, phi2_den);
+      
+      const lambda_num = sin_sigma * sin_alpha1;
+      const lambda_den = cosU1 * cos_sigma - sinU1 * sin_sigma * cos_alpha1;
+      const lambda_diff = Math.atan2(lambda_num, lambda_den);
+      
+      const C = f / 16 * cos2_alpha * (4 + f * (4 - 3 * cos2_alpha));
+      const L = lambda_diff - (1 - C) * f * sin_alpha * (
+        sigma + C * sin_sigma * (cos2_sigma_m + C * cos_sigma * 
+        (-1 + 2 * cos2_sigma_m * cos2_sigma_m)));
+      
+      const lambda2 = lambda1 + L;
+      
+      const alpha2 = Math.atan2(sin_alpha,
+        -sinU1 * sin_sigma + cosU1 * cos_sigma * cos_alpha1);
+      
+      const lat2 = phi2 * 180 / Math.PI;
+      const lon2 = lambda2 * 180 / Math.PI;
+      const azi2 = (alpha2 * 180 / Math.PI + 360) % 360;
+      
+      return [lat2, lon2, azi2];
+    }
+
+    // ==================== РЕШЕНИЕ 1: OpenTopoData с CORS-прокси ====================
+    async function get_opentopodata_solution1(pos_list, dataset = "srtm30m", interpolation = "cubic") {
+      if (pos_list.length > 100) {
+        throw new Error("Open Topo Data API ограничивает 100 точками за запрос");
+      }
+      
+      const locations = pos_list.map(pos => `${pos[0]},${pos[1]}`).join("|");
+      const baseUrl = `https://api.opentopodata.org/v1/${dataset}`;
+      const params = {
+        'locations': locations,
+        'interpolation': interpolation
+      };
+      
+      const queryString = new URLSearchParams(params).toString();
+      
+      // Используем CORS-прокси
+      const corsProxy = "https://corsproxy.io/?";
+      const url = corsProxy + encodeURIComponent(`${baseUrl}?${queryString}`);
+      
+      try {
+        debugInfo += `[РЕШЕНИЕ 1] Запрос через CORS-прокси: ${url.substring(0, 100)}...\n`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Python Elevation Client)',
+            'Accept': 'application/json'
+          },
+          timeout: 15000 // 15 секунд таймаут
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP Error ${response.status}: ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'OK') {
+          debugInfo += `[РЕШЕНИЕ 1] Успешно получено ${data.results.length} высот\n`;
+          return data.results.map(result => 
+            result.elevation !== null ? Math.round(result.elevation) : 0
+          );
+        } else {
+          throw new Error(`API error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        debugInfo += `[РЕШЕНИЕ 1] Ошибка: ${error.message}\n`;
+        throw error; // Пробрасываем ошибку для решения 2
+      }
+    }
+
+    // ==================== РЕШЕНИЕ 2: Альтернативный API Open-Elevation ====================
+    async function get_opentopodata_solution2(pos_list) {
+      if (pos_list.length > 100) {
+        throw new Error("Open-Elevation API ограничивает 100 точками за запрос");
+      }
+      
+      const locations = pos_list.map(pos => ({
+        latitude: pos[0],
+        longitude: pos[1]
+      }));
+      
+      const url = "https://api.open-elevation.com/api/v1/lookup";
+      
+      try {
+        debugInfo += `[РЕШЕНИЕ 2] Запрос к Open-Elevation API\n`;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            locations: locations
+          }),
+          timeout: 15000
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP Error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+          debugInfo += `[РЕШЕНИЕ 2] Успешно получено ${data.results.length} высот\n`;
+          return data.results.map(result => 
+            result.elevation !== null ? Math.round(result.elevation) : 0
+          );
+        } else {
+          throw new Error("No elevation data received");
+        }
+      } catch (error) {
+        debugInfo += `[РЕШЕНИЕ 2] Ошибка: ${error.message}\n`;
+        throw error; // Пробрасываем ошибку дальше
+      }
+    }
+
+    // ==================== ОБЪЕДИНЕННАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ВЫСОТ ====================
+    async function get_opentopodata(pos_list, dataset = "srtm30m", interpolation = "cubic") {
+      debugInfo += `Запрос высот для ${pos_list.length} точек...\n`;
+      
+      try {
+        // Пробуем Решение 1 (OpenTopoData с CORS-прокси)
+        debugInfo += `Пробуем Решение 1 (OpenTopoData с CORS-прокси)...\n`;
+        return await get_opentopodata_solution1(pos_list, dataset, interpolation);
+      } catch (error1) {
+        debugInfo += `Решение 1 не сработало: ${error1.message}\n`;
+        
+        try {
+          // Пробуем Решение 2 (Open-Elevation)
+          debugInfo += `Пробуем Решение 2 (Open-Elevation API)...\n`;
+          return await get_opentopodata_solution2(pos_list);
+        } catch (error2) {
+          debugInfo += `Решение 2 не сработало: ${error2.message}\n`;
+          throw new Error(`Невозможно получить данные рельефа. Обе API недоступны.\n1) ${error1.message}\n2) ${error2.message}`);
+        }
+      }
+    }
+
+    function make_pos_list(lat, lon, az, dist_m = 16000, step_m = 50) {
+      const l = Math.floor(dist_m / step_m) + 1;
+      const result = new Array(l);
+      result[0] = [lat, lon];
+      
+      for (let i = 1; i < l; i++) {
+        const t = vincenty_direct(lat, lon, az, step_m * i);
+        result[i] = [t[0], t[1]];
+      }
+      
+      return result;
+    }
+
+    function correction(h_list, step = 50, h_observer = 1.75, idx = 0) {
+      const R = 6371000.0;
+      const pressure = m_pres.length > idx && m_pres[idx] !== undefined ? m_pres[idx] : 1013.25;
+      const temperature = m_temp.length > idx && m_temp[idx] !== undefined ? m_temp[idx] : 15;
+      const k = 0.142 * (pressure/1013.25) * (288.15/(temperature + 273.15));
+      //const k = (1/6.0) * (m_pres[idx]/1013.25) * (288.15/(m_temp[idx] + 273.15));
+      const R_eff = R / (1 - k);
+      const observer_total = h_list[0] + h_observer;
+      const h_corrected = new Array(h_list.length);
+      
+      h_corrected[0] = h_list[0] - observer_total;
+      
+      for (let i = 1; i < h_list.length; i++) {
+        const dist = i * step;
+        h_corrected[i] = h_list[i] - observer_total - (dist * dist) / (2 * R_eff);
+      }
+      
+      return h_corrected;
+    }
+
+    function horizon(corrected, h_list, step = 50) {
+      let tan_h_max = -Infinity;
+      let i_max = 0;
+      
+      for (let i = 1; i < corrected.length; i++) {
+        const dist = i * step;
+        const tan_h = corrected[i] / dist;
+        if (tan_h > tan_h_max) {
+          tan_h_max = tan_h;
+          i_max = i;
+        }
+      }
+      
+      const alpha = Math.atan(tan_h_max) * 180 / Math.PI;
+      return [h_list[i_max], i_max * step, alpha];
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function graph(corrected,
+           h_observer,
+           step = 50,
+           h_div = 10,
+           w_div = -1,
+           hrzn_i = 0,
+           scr_w = 32) {
+      
+      function rnd(x, div) {
+        return Math.round(x / div) * div;
+      }
+
+      const observer_mark = rnd(h_observer, h_div);
+      const max_h = Math.max(Math.max(...corrected) + h_observer, observer_mark);
+      const min_h = Math.min(Math.min(...corrected) + h_observer, observer_mark);
+      const delta = max_h - min_h;
+      const insert = Math.max(
+        Math.round(max_h).toString().length,
+        Math.round(min_h).toString().length
+      );
+      
+      let result = "";
+      
+      if (w_div === -1) {
+        scr_w -= insert;
+        const total_w = corrected.length;
+        w_div = Math.round(total_w / scr_w);
+      }
+      
+      let actualStep = step;
+      let processedCorrected = [...corrected];
+      let processedHrznI = hrzn_i;
+      if (w_div > 1) {
+        actualStep *= w_div;
+        processedHrznI = Math.round(hrzn_i / w_div);
+        processedCorrected = [];
+        
+        for (let i = 0; i < corrected.length; i += w_div) {
+          // В Python оригинале ЗАКОММЕНТИРОВАНО условие if i == 0!
+          // Поэтому ВСЕГДА берем max из среза
+          const slice = corrected.slice(i, i + w_div);
+          processedCorrected.push(Math.max(...slice));
+        }
+      }
+      if (processedHrznI > 2) {
+       processedHrznI -= 1
+      }
+      const x = Math.round(delta / h_div);
+      //let debug = `graph corrected: ${processedCorrected.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
+      //debug += `graph corrected: ${processedCorrected.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
+      //debug += `\n\n${x} ${delta} ${h_div} ${min_h} ${h_div} \n`;
+      for (let i = 0; i < processedCorrected.length; i++) {
+        let h = processedCorrected[i];
+        h += h_observer;
+        const l = Math.round((h - min_h) / h_div);
+        //debug += `${h.toFixed(1)} `;
+        let c;
+        if (i === processedHrznI) {
+          c = "A";
+        } else {
+          c = "o";
+        }
+        
+        result += c.repeat(l + 1) + 
+             ".".repeat(x - l) + 
+             "\n";
+      }
+      //debug += `\n`;
+      const d = Math.round(delta / h_div);
+      const vals = [];
+      
+      for (let i = d; i >= 0; i--) {
+        const value = rnd(i * h_div + min_h, h_div);
+        if (value === observer_mark) {
+          vals.push(value.toString().padStart(insert, ".") + "@");
+        } else {
+          vals.push(value.toString().padStart(insert, ".") + "|");
+        }
+      }
+      
+      const rows = result.slice(0, -1).split("\n");
+      result = "";
+      
+      // поворот на 90° против часовой стрелки
+      const maxRowLength = Math.max(...rows.map(row => row.length));
+      let rotated = [];
+      
+      for (let i = 0; i < maxRowLength; i++) {
+        const col = rows.map(row => row[i] || " ");
+        rotated.push(col);
+      }
+      rotated = rotated.reverse();
+      
+      for (let i = 0; i < vals.length; i++) {
+        result += vals[i] + 
+             rotated[i].join("") + 
+             "\n";
+      }
+      
+      result += ".".repeat(insert) + 
+           "+" + 
+           "~".repeat(processedCorrected.length) + 
+           "\n";
+      
+      const nums = [];
+      for (let i = 0; i <= processedCorrected.length; i++) {
+        if (i % 2 === 0) {
+          nums.push((i * actualStep).toString());
+        } else {
+          nums.push("0");
+        }
+      }
+      
+      const maxLen = Math.max(...nums.map(n => n.length));
+      const paddedNums = nums.map(n => n.padStart(maxLen, "0"));
+      const scale = [];
+      
+      for (let pos = 0; pos < maxLen; pos++) {
+        let line = ".".repeat(insert);
+        for (let n of paddedNums) {
+          // если это ведущий ноль — заменяем точкой
+          if (n[pos] === "0" && pos < maxLen - n.replace(/^0+/, "").length) {
+            line += ".";
+          } else {
+            line += n[pos];
+          }
+        }
+        scale.push(line);
+      }
+      
+      result += scale.join("\n");
+      return result;//+debug;
+    }
+
+
+    // ==================== ОСНОВНАЯ ФУНКЦИЯ РАСЧЕТА РЕЛЬЕФА С ОТЛАДКОЙ ====================
+    async function calc_with_relief(dist = 15950, step = 50) {
+      debugInfo = "=== НАЧАЛО РАСЧЕТА РЕЛЬЕФА ===\n\n";
+      
+      try {
+        const latitude = parseFloat(document.getElementById('latitude').value);
+        const longitude = parseFloat(document.getElementById('longitude').value);
+        const time_zone = parseInt(document.getElementById('timezone').value);
+        const dst_element = document.querySelector('input[name="daylight"]:checked');
+        const dst = dst_element ? dst_element.value : "0";
+        const morning_twilight = parseFloat(document.getElementById('angle1').value);
+        const evening_twilight = parseFloat(document.getElementById('angle2').value);
+        
+        debugInfo += `Входные параметры:\n`;
+        debugInfo += `Широта: ${latitude}\n`;
+        debugInfo += `Долгота: ${longitude}\n`;
+        debugInfo += `Угол 1: ${morning_twilight}\n`;
+        debugInfo += `Угол 2: ${evening_twilight}\n`;
+        debugInfo += `Дистанция: ${dist} м\n`;
+        debugInfo += `Шаг: ${step} м\n\n`;
+        
+        if (isNaN(latitude) || isNaN(longitude)) {
+          debugInfo += "Ошибка: Не заданы координаты\n";
+          return debugInfo;
+        }
+        
+        if (latitude >= 60) {
+          debugInfo += "Ошибка: Невозможно рассчитать рельеф севернее 60° с.ш.\n";
+          return debugInfo;
+        }
+        
+        const ut = Math.floor(Date.now() / 1000);
+        const base_ut = ut - (ut % 86400) + 12 * 3600;
+        
+        debugInfo += `Текущее время (UTC): ${new Date(ut * 1000).toISOString()}\n`;
+        debugInfo += `Базовое время для расчетов (UTC): ${new Date(base_ut * 1000).toISOString()}\n\n`;
+        
+        // Получаем времена намазов для определения азимутов
+        const t_result = calc_plus(latitude, longitude, base_ut, morning_twilight, evening_twilight);
+        const t = t_result[0];
+        const c = t_result[1];
+        
+        debugInfo += `Результаты calc_plus:\n`;
+        for (let i = 0; i < t.length; i++) {
+          debugInfo += `t[${i}] = ${t[i]}\n`;
+        }
+        debugInfo += `Индексы для температуры/давления: ${c.join(', ')}\n\n`;
+        
+        if (t[1] === false || t[4] === false) {
+          debugInfo += "Ошибка: Не удалось рассчитать время восхода/фаджр\n";
+          return debugInfo;
+        }
+        
+        debugInfo += `Время восхода (часы от полуночи UTC): ${t[1]}\n`;
+        debugInfo += `Время захода (часы от полуночи UTC): ${t[4]}\n\n`;
+        
+        // Получаем азимуты солнца в моменты восхода и фаджра
+        const sunrise_ut = base_ut - 12 * 3600 + t[1] * 3600;
+        const sunset_ut = base_ut - 12 * 3600 + t[4] * 3600;
+        
+        debugInfo += `Время для расчета азимута восхода (UTC): ${new Date(sunrise_ut * 1000).toISOString()}\n`;
+        debugInfo += `Время для расчета азимута захода (UTC): ${new Date(sunset_ut * 1000).toISOString()}\n\n`;
+        
+        const az1_result = sun_az_alt(latitude, longitude, sunrise_ut);
+        const az2_result = sun_az_alt(latitude, longitude, sunset_ut);
+        
+        const az1 = az1_result[0];
+        const az2 = az2_result[0];
+        
+        debugInfo += `Азимут восхода: ${az1.toFixed(2)}°\n`;
+        debugInfo += `Высота восхода: ${az1_result[1].toFixed(2)}°\n`;
+        debugInfo += `Азимут захода: ${az2.toFixed(2)}°\n`;
+        debugInfo += `Высота захода: ${az2_result[1].toFixed(2)}°\n\n`;
+        
+        debugInfo += `Разница азимутов: ${Math.abs(az1 - az2).toFixed(2)}°\n`;
+        
+        if (Math.abs(az1 - az2) < 1) {
+          debugInfo += "ВНИМАНИЕ: Азимуты почти одинаковые! Это может быть ошибкой.\n\n";
+        } else {
+          debugInfo += "Азимуты различаются - это правильно.\n\n";
+        }
+        
+        // Создаем списки координат для восхода и заката
+        debugInfo += `Создание списков координат...\n`;
+        const p_list1 = make_pos_list(latitude, longitude, az1, dist, step);
+        const p_list2 = make_pos_list(latitude, longitude, az2, dist, step);
+        
+        debugInfo += `Количество точек для восхода: ${p_list1.length}\n`;
+        debugInfo += `Количество точек для заката: ${p_list2.length}\n\n`;
+        
+        debugInfo += `Первые 3 точки для восхода:\n`;
+        for (let i = 0; i < Math.min(3, p_list1.length); i++) {
+          debugInfo += ` [${i}]: ${p_list1[i][0].toFixed(4)}°, ${p_list1[i][1].toFixed(4)}°\n`;
+        }
+        debugInfo += `\nПервые 3 точки для заката:\n`;
+        for (let i = 0; i < Math.min(3, p_list2.length); i++) {
+          debugInfo += ` [${i}]: ${p_list2[i][0].toFixed(4)}°, ${p_list2[i][1].toFixed(4)}°\n`;
+        }
+        debugInfo += `\n`;
+        
+        // Проверяем, разные ли координаты
+        const same_coords = p_list1[1][0] === p_list2[1][0] && p_list1[1][1] === p_list2[1][1];
+        debugInfo += `Координаты второй точки одинаковые? ${same_coords ? 'ДА - ОШИБКА!' : 'НЕТ - правильно'}\n\n`;
+        
+        // Получаем высоты для точек восхода
+        debugInfo += `Получение высот для точек восхода...\n`;
+        let h_list1 = [];
+        for (let i = 0; i < p_list1.length; i += 100) {
+          const chunk = p_list1.slice(i, i + 100);
+          await sleep(667);
+          try {
+            debugInfo += ` Запрос точек ${i}-${Math.min(i+99, p_list1.length-1)}...\n`;
+            const elevations = await get_opentopodata(chunk, "srtm30m", "cubic");
+            h_list1.push(...elevations);
+            debugInfo += ` Получено ${elevations.length} высот\n`;
+          } catch (error) {
+            debugInfo += ` КРИТИЧЕСКАЯ ОШИБКА: ${error.message}\n`;
+            throw error;
+          }
+        }
+        debugInfo += `\nПолучение высот для точек заката...\n`;
+        let h_list2 = [];
+        for (let i = 0; i < p_list2.length; i += 100) {
+          const chunk = p_list2.slice(i, i + 100);
+          await sleep(667);
+          try {
+            debugInfo += ` Запрос точек ${i}-${Math.min(i+99, p_list2.length-1)}...\n`;
+            const elevations = await get_opentopodata(chunk, "srtm30m", "cubic");
+            h_list2.push(...elevations);
+            debugInfo += ` Получено ${elevations.length} высот\n`;
+          } catch (error) {
+            debugInfo += ` КРИТИЧЕСКАЯ ОШИБКА: ${error.message}\n`;
+            throw error;
+          }
+        }
+        
+        debugInfo += `\nПервые 50 высот для восхода: ${h_list1.slice(0, 50).join(', ')}\n`;
+        debugInfo += `Первые 50 высот для заката: ${h_list2.slice(0, 50).join(', ')}\n\n`;
+        
+        // Проверяем, разные ли высоты
+        const same_heights = JSON.stringify(h_list1.slice(0, 5)) === JSON.stringify(h_list2.slice(0, 5));
+        debugInfo += `Высоты одинаковые? ${same_heights ? 'ДА - возможно ошибка' : 'НЕТ - правильно'}\n\n`;
+        
+        // Применяем коррекции
+        debugInfo += `Применение коррекций...\n`;
+        const hc1 = correction(h_list1, step, 1.75, c[1]);
+        const hc2 = correction(h_list2, step, 1.75, c[4]);
+        
+        debugInfo += `Индекс для температуры/давления восхода: ${c[1]}\n`;
+        debugInfo += `Индекс для температуры/давления заката: ${c[4]}\n`;
+        debugInfo += `Температура восхода: ${m_temp.length > c[1] ? m_temp[c[1]] : 'нет данных'}\n`;
+        debugInfo += `Давление восхода: ${m_pres.length > c[1] ? m_pres[c[1]] : 'нет данных'}\n`;
+        debugInfo += `Температура заката: ${m_temp.length > c[4] ? m_temp[c[4]] : 'нет данных'}\n`;
+        debugInfo += `Давление заката: ${m_pres.length > c[4] ? m_pres[c[4]] : 'нет данных'}\n\n`;
+        
+        // Находим горизонт
+        debugInfo += `Поиск горизонта...\n`;
+        const [h1, d1, a1] = horizon(hc1, h_list1, step);
+        const [h2, d2, a2] = horizon(hc2, h_list2, step);
+        
+        debugInfo += `Восход: высота=${h1.toFixed(0)}м, дистанция=${d1}м, угол=${a1.toFixed(4)}°\n`;
+        debugInfo += `Закат: высота=${h2.toFixed(0)}м, дистанция=${d2}м, угол=${a2.toFixed(4)}°\n\n`;
+        
+        // Находим координаты точек горизонта
+        debugInfo += `Расчет координат точек горизонта...\n`;
+        const t1 = vincenty_direct(latitude, longitude, az1, d1);
+        const t2 = vincenty_direct(latitude, longitude, az2, d2);
+        
+        debugInfo += `Точка горизонта восхода: ${t1[0].toFixed(4)}°, ${t1[1].toFixed(4)}°\n`;
+        debugInfo += `Точка горизонта заката: ${t2[0].toFixed(4)}°, ${t2[1].toFixed(4)}°\n\n`;
+        
+        // hrzn_i1 и hrzn_i2 - индексы точек горизонта:
+        const hrzn_i1 = Math.floor(d1 / step); // для восхода
+        const hrzn_i2 = Math.floor(d2 / step); // для заката 
+
+        // Отладка для понимания высот
+        debugInfo += `\nОтладка высот для графика:\n`;
+        debugInfo += `Высота наблюдателя: ${h_list1[0]} м\n`;
+        debugInfo += `Первые 50 исправленных высот: ${hc1.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
+        debugInfo += `Первые 50 полных высот: ${hc1.slice(0, 50).map(h => (h + h_list1[0]).toFixed(1)).join(', ')}\n`;
+        debugInfo += `Индекс горизонта: ${hrzn_i1}, значение: ${hc1[hrzn_i1] + h_list1[0]} м\n`;
+
+        // Аналогично для заката
+        debugInfo += `\nДля заката:\n`;
+        debugInfo += `Высота наблюдателя: ${h_list2[0]} м\n`;
+        debugInfo += `Первые 50 исправленных высот: ${hc2.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
+        debugInfo += `Первые 50 полных высот: ${hc2.slice(0, 50).map(h => (h + h_list2[0]).toFixed(1)).join(', ')}\n`;
+        debugInfo += `Индекс горизонта: ${hrzn_i2}, значение: ${hc2[hrzn_i2] + h_list2[0]} м\n`;
+
+
+        const sunriseGraph = graph(hc1, h_list1[0], step, 10, 5, hrzn_i1, 36);
+        const sunsetGraph = graph(hc2, h_list2[0], step, 10, 5, hrzn_i2, 36);
+
+
+        const ptm = await get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight, a1, a2);
+
+        // Проверяем на ошибки
+        if (ptm.error) {
+          debugInfo += `Ошибка при расчете времени: ${ptm.error}\n`;
+          // Можно продолжить или выбросить ошибку
+        }
+
+        // Форматируем результат для вывода
+        let ptm_str = "";
+        if (ptm.times && ptm.times.length > 0) {
+          ptm_str += `=== ВРЕМЯ ВОСХОДА И ЗАХОДА С УЧЕТОМ РЕЛЬЕФА ===\n`;
+          //ptm_str += `(коррекция угла горизонта:
+        //восход ${a1.toFixed(2)}°
+        //заход ${a2.toFixed(2)}°)\n\n`;
+          
+        // Восход - индекс 1, Магриб - индекс 4 в массиве namazlar
+        const sunriseIndex = 1; // "Восход"
+        const maghribIndex = 4; // "Магриб"
+
+        if (ptm.times[sunriseIndex]) {
+          ptm_str += `Видимый восход: ${ptm.times[sunriseIndex].today} (завтра: ${ptm.times[sunriseIndex].tomorrow})\n`;
+        }
+        if (ptm.times[maghribIndex]) {
+          ptm_str += `Видимый заход : ${ptm.times[maghribIndex].today} (завтра: ${ptm.times[maghribIndex].tomorrow})\n`;
+        }
+
+        } else {
+          ptm_str = "Не удалось рассчитать время намазов с учетом рельефа";
+        }
+
+                
+        // Формируем итоговый результат
+        //const info = `=== ИТОГОВЫЕ РЕЗУЛЬТАТЫ РАСЧЕТА РЕЛЬЕФА ===
+        //const info = `${ptm_str}
+        const info = `ОЖИДАЕМОЕ ВРЕМЯ ВОСХОДА И ЗАХОДА С УЧЕТОМ РЕЛЬЕФА
+
+ВОСХОД : ${ptm.times[1].today}
+Азимут : ${az1.toFixed(2)}°
+Локация: ${t1[0].toFixed(4)}°, ${t1[1].toFixed(4)}°
+Высота : ${h1.toFixed(0)}m
+Дистанц: ${d1}m
+Угол  : ${a1.toFixed(4)}°
+Темп. : ${m_temp[c[1]]}°C
+Давл. : ${m_pres[c[1]]}гПа
+${sunriseGraph} 
+
+ЗАХОД : ${ptm.times[4].today}
+Азимут : ${az2.toFixed(2)}°
+Локация: ${t2[0].toFixed(4)}°, ${t2[1].toFixed(4)}°
+Высота : ${h2.toFixed(0)}m
+Дистанц: ${d2}m
+Угол  : ${a2.toFixed(4)}°
+Темп. : ${m_temp[c[4]]}°C
+Давл. : ${m_pres[c[4]]}гПа
+${sunsetGraph}
+
+________________________
+@ - точка наблюдения
+А - точка восхода/захода
+`;
+
+//=== ИНФОРМАЦИЯ ОТЛАДКИ ===
+//${debugInfo}`;
+        
+        return info;
+        
+      } catch (error) {
+        debugInfo += `\n❌ КРИТИЧЕСКАЯ ОШИБКА: ${error.message}\n`;
+        return `❌ НЕВОЗМОЖНО РАССЧИТАТЬ РЕЛЬЕФ\n\n${debugInfo}\n\nПричина: ${error.message}\n\nПопробуйте:\n1. Проверить интернет-соединение\n2. Убедиться, что координаты корректны\n3. Попробовать позже (API могут быть временно недоступны)`;
+      }
+    }
+
+    // ==================== ОСНОВНАЯ ФУНКЦИЯ РАСЧЕТА НАМАЗОВ ====================
+    async function get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight, sunrise_angle=0, sunset_angle=0) {
+      const lat = parseFloat(latitude);
+      const lon = parseFloat(longitude);
+      const tz = parseInt(time_zone, 10);
+      const dst_num = parseInt(dst, 10);
+      const morn_tw = parseFloat(morning_twilight);
+      const even_tw = parseFloat(evening_twilight);
+
+      if (isNaN(lat) || isNaN(lon) || isNaN(tz) || isNaN(dst_num) || 
+        isNaN(morn_tw) || isNaN(even_tw)) {
+        return {error: "Ошибка: неверные параметры расчета"};
+      }
+
+      try {
+        const ut = Math.floor(Date.now() / 1000);
+        const base_ut = ut - (ut % 86400) + 12 * 3600;
+        
+        if (useWeatherData) {
+          const weatherData = await get_weather_forecast(lat, lon);
+          if (weatherData && weatherData.hourly) {
+            m_dttm = [];
+            m_temp = [];
+            m_pres = [];
+            
+            for (let i = 0; i < 48; i++) {
+              if (weatherData.hourly.time[i]) {
+                m_dttm.push(get_ut(weatherData.hourly.time[i]));
+              }
+              if (weatherData.hourly.temperature_2m && i < weatherData.hourly.temperature_2m.length) {
+                m_temp.push(weatherData.hourly.temperature_2m[i]);
+              }
+              if (weatherData.hourly.pressure_msl && i < weatherData.hourly.pressure_msl.length) {
+                m_pres.push(weatherData.hourly.pressure_msl[i]);
+              }
+            }
+          }
+        } else {
+          m_dttm = [];
+          m_temp = [];
+          m_pres = [];
+          
+          for (let i = 0; i < 48; i++) {
+            m_dttm.push(base_ut + i * 3600);
+            m_temp.push(15);
+            m_pres.push(1013.25);
+          }
+        }
+
+        const t_result = calc_plus(lat, lon, base_ut, morn_tw, even_tw, sunrise_angle, sunset_angle);
+        const p_result = calc_plus(lat, lon, base_ut + 86400, morn_tw, even_tw, sunrise_angle, sunset_angle);
+        
+        const t = t_result[0];
+        const p = p_result[0];
+
+        const today_offset = tz + is_dst(base_ut, tz, dst_num);
+        const tomorrow_offset = tz + is_dst(base_ut + 86400, tz, dst_num);
+
+        const [_, month, day, __, ___, ____] = ut2dt(base_ut + today_offset * 3600);
+
+        const result = {
+          date: `${day.toString().padStart(2, '0')} ${months_short[month - 1]}`,
+          times: [],
+          hasWhiteNights: false
+        };
+
+        for (let i = 0; i < 6; i++) {
+          const tt_offset = tz + is_dst(base_ut + t[i] * 3600.0, tz, dst_num);
+          const tp_offset = tz + is_dst(base_ut + p[i] * 3600.0 + 86400, tz, dst_num);
+
+          let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
+          let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
+
+          let isWhiteNight = false;
+          if (t[6]) {
+            if (i === 0 || i === 5) {
+              isWhiteNight = true;
+              result.hasWhiteNights = true;
+            }
+          }
+
+          result.times.push({
+            name: namazlar[i],
+            today: todayTime,
+            tomorrow: tomorrowTime,
+            isWhiteNight: isWhiteNight,
+            class: prayerClasses[i]
+          });
+        }
+
+        return result;
+      } catch (e) {
+        console.error("Error in get_today:", e);
+        return {error: "Ошибка расчета времени намазов"};
+      }
+    }
+
+    // ==================== ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ====================
+    function validateInputs() {
+      let isValid = true;
+
+      document.querySelectorAll('.error').forEach(el => el.textContent = '');
+
+      const latitude = parseFloat(document.getElementById('latitude').value);
+      if (isNaN(latitude) || latitude < -90 || latitude > 90) {
+        document.getElementById('latitudeError').textContent = 'Широта должна быть числом от -90 до 90';
+        isValid = false;
+      }
+
+      const longitude = parseFloat(document.getElementById('longitude').value);
+      if (isNaN(longitude) || longitude < -180 || longitude > 180) {
+        document.getElementById('longitudeError').textContent = 'Долгота должна быть числом от -180 до 180';
+        isValid = false;
+      }
+
+      const timezone = parseFloat(document.getElementById('timezone').value);
+      if (isNaN(timezone) || timezone < -12 || timezone > 14) {
+        document.getElementById('timezoneError').textContent = 'Часовой пояс должен быть числом от -12 до 14';
+        isValid = false;
+      }
+
+      const angle1 = parseFloat(document.getElementById('angle1').value);
+      if (isNaN(angle1) || angle1 < -90 || angle1 > 90) {
+        document.getElementById('angle1Error').textContent = 'Угол 1 должен быть числом от -90 до 90';
+        isValid = false;
+      }
+
+      const angle2 = parseFloat(document.getElementById('angle2').value);
+      if (isNaN(angle2) || angle2 < -90 || angle2 > 90) {
+        document.getElementById('angle2Error').textContent = 'Угол 2 должен быть числом от -90 до 90';
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    function updateCurrentDateTime() {
+      const now = new Date();
+      const dateOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+      };
+      const timeOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      };
+
+      document.getElementById('currentDate').textContent = now.toLocaleDateString('ru-RU', dateOptions);
+      document.getElementById('currentTime').textContent = now.toLocaleTimeString('ru-RU', timeOptions);
+    }
+
+    async function updatePrayerTimes() {
+      if (!validateInputs()) {
+        document.getElementById('prayerTimesTable').innerHTML = '<div class="error">Пожалуйста, исправьте ошибки в настройках</div>';
+        return;
+      }
+
+      try {
+        const latitude = document.getElementById('latitude').value;
+        const longitude = document.getElementById('longitude').value;
+        const time_zone = document.getElementById('timezone').value;
+        const dst_element = document.querySelector('input[name="daylight"]:checked');
+        const dst = dst_element ? dst_element.value : "0";
+        const morning_twilight = document.getElementById('angle1').value;
+        const evening_twilight = document.getElementById('angle2').value;
+        
+        document.getElementById('prayerTimesTable').innerHTML = '<div class="white-night">Расчет времени намазов...</div>';
+        
+        const result = await get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight);
+
+        if (result.error) {
+          document.getElementById('prayerTimesTable').innerHTML = `<div class="error">${result.error}</div>`;
+          return;
+        }
+
+        let tableHTML = `
+          <table class="prayer-table">
+            <thead>
+              <tr>
+                <th>Намаз</th>
+                <th>Сегодня (${result.date})</th>
+                <th>Завтра</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        result.times.forEach(prayer => {
+          const todayClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
+          const tomorrowClass = prayer.isWhiteNight ? 'white-night' : prayer.class;
+
+          tableHTML += `
+            <tr>
+              <td>${prayer.name}</td>
+              <td class="${todayClass}">${prayer.today}</td>
+              <td class="${tomorrowClass}">${prayer.tomorrow}</td>
+            </tr>
+          `;
+        });
+
+        tableHTML += `
+            </tbody>
+          </table>
+        `;
+
+        if (result.hasWhiteNights) {
+          tableHTML += `<div class="white-night">${no_night}</div>`;
+        }
+
+        document.getElementById('prayerTimesTable').innerHTML = tableHTML;
+
+      } catch (e) {
+        console.error("Error in updatePrayerTimes:", e);
+        document.getElementById('prayerTimesTable').innerHTML = '<div class="error">Ошибка при расчете времени намазов</div>';
+      }
+    }
+
+    async function calculateRelief() {
+      const reliefResult = document.getElementById('reliefResult');
+      
+      reliefResult.style.display = 'block';
+      reliefResult.textContent = "Идет расчет рельефа...\nЭто может занять 10-20 секунд.\n\nПробуем получить реальные данные высот...";
+      
+      try {
+        const result = await calc_with_relief();
+        reliefResult.textContent = result;
+      } catch (error) {
+        reliefResult.textContent = `Ошибка: ${error.message}\n\nИнформация отладки:\n${debugInfo}`;
+      }
+    }
+
+    function showSettings() {
+      document.getElementById('mainPage').style.display = 'none';
+      document.getElementById('settingsPage').style.display = 'block';
+      loadSettings();
+    }
+
+    function loadSettings() {
+      const saved = localStorage.getItem('astroSettings');
+      if (saved) {
+        try {
+          const settings = saved.split(';');
+          if (settings.length >= 7) {
+            document.getElementById('latitude').value = settings[0] || '';
+            document.getElementById('longitude').value = settings[1] || '';
+            document.getElementById('timezone').value = settings[2] || '0';
+
+            if (settings[3] === '1') {
+              document.getElementById('daylightYes').checked = true;
+            } else {
+              document.getElementById('daylightNo').checked = true;
+            }
+
+            document.getElementById('angle1').value = settings[4] || '18';
+            document.getElementById('angle2').value = settings[5] || '17';
+            
+            if (settings[6] === '1') {
+              document.getElementById('useWeather').checked = true;
+              useWeatherData = true;
+            } else {
+              document.getElementById('useWeather').checked = false;
+              useWeatherData = false;
+            }
+          }
+        } catch (e) {
+          console.error("Error loading settings:", e);
+        }
+      }
+      updateCurrentDateTime();
+      updatePrayerTimes();
+    }
+
+    function saveSettings() {
+      if (!validateInputs()) {
+        return;
+      }
+
+      try {
+        const latitude = document.getElementById('latitude').value;
+        const longitude = document.getElementById('longitude').value;
+        const timezone = document.getElementById('timezone').value;
+        const daylight = document.querySelector('input[name="daylight"]:checked')?.value || '0';
+        const angle1 = document.getElementById('angle1').value;
+        const angle2 = document.getElementById('angle2').value;
+        const useWeather = document.getElementById('useWeather').checked ? '1' : '0';
+        
+        useWeatherData = document.getElementById('useWeather').checked;
+
+        const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2, useWeather].join(';');
+        localStorage.setItem('astroSettings', settingsString);
+
+        document.getElementById('settingsPage').style.display = 'none';
+        document.getElementById('mainPage').style.display = 'block';
+        updateCurrentDateTime();
+        updatePrayerTimes();
+      } catch (e) {
+        console.error("Error saving settings:", e);
+        alert("Ошибка при сохранении настроек");
+      }
+    }
+
+    function resetToDefault() {
+      if (confirm("Вы уверены, что хотите сбросить настройки к значениям по умолчанию?")) {
+        document.getElementById('latitude').value = '';
+        document.getElementById('longitude').value = '';
+        document.getElementById('timezone').value = '0';
+        document.getElementById('daylightNo').checked = true;
+        document.getElementById('angle1').value = '18';
+        document.getElementById('angle2').value = '17';
+        document.getElementById('useWeather').checked = false;
+        useWeatherData = false;
+
+        document.querySelectorAll('.error').forEach(el => el.textContent = '');
+
+        localStorage.removeItem('astroSettings');
+        updateCurrentDateTime();
+        updatePrayerTimes();
+      }
+    }
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('mainPage').style.display = 'block';
+      document.getElementById('settingsPage').style.display = 'none';
+      document.getElementById('reliefResult').style.display = 'none';
+      
+      document.getElementById('useWeather').addEventListener('change', function() {
+        useWeatherData = this.checked;
+      });
+      
+      updateCurrentDateTime();
+      loadSettings();
+
+      setInterval(updateCurrentDateTime, 1000);
+      setInterval(updatePrayerTimes, 360000);
+    });
+  </script>
 </body>
 </html>
