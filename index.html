@@ -13,19 +13,19 @@
 
   Ключевые особенности:
 
-- улучшенный алгоритм положения Солнца на базе USNO (добавлены 
+- улучшенный алгоритм положения Солнца на базе USNO (добавлены
 эффекты нутации, прецессии земнойоси, аберации света, улучшенный
 расчёт размеров солнечного диска)
 - итеративный расчёт координат Солнца
-- использование моделей атмосферной рефракции (Stellarium или 
-Meeus 2 издания) 
+- использование моделей атмосферной рефракции (Stellarium или
+Meeus 2 издания)
 - значения давления и температуры по умолчанию: 1013.25 гПа/13°С
 - метеоданные: https://api.open-meteo.com/v1/forecast/
 - геоданные: https://api.opentopodata.org/v1/
 - рассчет белых ночей методом сдвига широты к югу до ближайшего
 места где наступает астрономическая ночь
 - автоматический переходна летнее/зимнее время
-- рассчет горизонта с коррекцией атмосферной рефракции и 
+- рассчет горизонта с коррекцией атмосферной рефракции и
 округлостью земной поверхности
 
        ---------------
@@ -296,7 +296,7 @@ Meeus 2 издания)
     let m_temp = [];
     let m_pres = [];
     let useWeatherData = false;
-    
+
     // Переменные для отладки
     let debugInfo = "";
 
@@ -449,7 +449,7 @@ Meeus 2 издания)
     // ==================== ПОГОДНЫЙ API ====================
     async function get_weather_forecast(lat, lon) {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,pressure_msl&timezone=auto&forecast_days=2`;
-      
+
       try {
         const response = await fetch(url, {
           headers: {
@@ -457,11 +457,11 @@ Meeus 2 издания)
             'Accept': 'application/json'
           }
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         return data;
       } catch (error) {
@@ -501,14 +501,14 @@ Meeus 2 издания)
     function stellarium_refraction(geom_alt_deg, pressure = 1013.25, temperature = 15) {
       const MIN_GEO_ALTITUDE_DEG = -3.54;
       const TRANSITION_WIDTH_GEO_DEG = 1.46;
-      
+
       const press_temp_corr = (pressure / 1010.0) * (283.0 / (273.0 + temperature)) / 60.0;
       let refraction_deg = 0.0;
-      
+
       if (geom_alt_deg > MIN_GEO_ALTITUDE_DEG) {
         refraction_deg = press_temp_corr * (1.02 / Math.tan(
           (geom_alt_deg + 10.3 / (geom_alt_deg + 5.11)) * Math.PI / 180) + 0.0019279);
-        
+
         const apparent_alt_deg = geom_alt_deg + refraction_deg;
         if (apparent_alt_deg > 90.0) {
           refraction_deg = 90.0 - geom_alt_deg;
@@ -519,11 +519,11 @@ Meeus 2 издания)
         const factor = (geom_alt_deg - (MIN_GEO_ALTITUDE_DEG - TRANSITION_WIDTH_GEO_DEG)) / TRANSITION_WIDTH_GEO_DEG;
         refraction_deg = r_m5 * factor;
       }
-      
+
       return refraction_deg;
     }
 
-    function calculate(latitude, longitude, ut, morning_twilight, evening_twilight, 
+    function calculate(latitude, longitude, ut, morning_twilight, evening_twilight,
              pressure = 1013.25, temperature = 15, sunrise_angle = 0, sunset_angle = 0) {
       try {
         morning_twilight = Math.abs(morning_twilight);
@@ -552,7 +552,7 @@ Meeus 2 издания)
         const angle = SD + stellarium_refraction(0, pressure, temperature) - sunrise_angle;
         const lvl_val = Level(angle);
         t[1] = lvl_val !== false ? t[0] - lvl_val : false;
-        
+
         const angle2 = SD + stellarium_refraction(0, pressure, temperature) - sunset_angle;
         const lvl_val2 = Level(angle2);
         t[2] = lvl_val2 !== false ? t[0] + lvl_val2 : false;
@@ -594,8 +594,8 @@ Meeus 2 издания)
             n = Math.floor((ut - m_dttm[0]) / 3600);
           }
         }
-        
-        const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight, 
+
+        const t = calculate(latitude, longitude, ut, morning_twilight, evening_twilight,
                  sunrise_angle, sunset_angle);
         const r = [0, 0, 0, 0, 0, 0, false];
         const c = [0, 0, 0, 0, 0, 0];
@@ -607,19 +607,19 @@ Meeus 2 издания)
           }
           r[i] = Math.round(t[i]);
         }
-        
+
         let last_p = null;
         for (let i = 0; i < 6; i++) {
           if (t[i] === false) {
             r[i] = false;
             continue;
           }
-          
+
           const pressure = m_pres.length > 0 ? m_pres[r[i] + n] : 1013.25;
           const temperature = m_temp.length > 0 ? m_temp[r[i] + n] : 15;
-          
-          last_p = calculate(latitude, longitude, ut - 43200 + t[i] * 3600, 
-                   morning_twilight, evening_twilight, 
+
+          last_p = calculate(latitude, longitude, ut - 43200 + t[i] * 3600,
+                   morning_twilight, evening_twilight,
                    pressure, temperature, sunrise_angle, sunset_angle);
           c[i] = r[i] + n;
           r[i] = last_p[i];
@@ -636,30 +636,30 @@ Meeus 2 издания)
     function sun_az_alt(latitude, longitude, ut) {
       const [ra, dec, EqT, SD] = usno_sun(ut);
       const [year, month, day, hour, minute, second] = ut2dt(ut);
-      
+
       const t0 = 12 - longitude / 15.0 - EqT;
       const UT = hour + minute / 60 + second / 3600;
       const H_deg = (UT - t0) * 15.0;
       const H_rad = H_deg * Math.PI / 180;
-      
+
       const fi = latitude * Math.PI / 180;
       const delta = dec * Math.PI / 180;
       let sin_h = Math.sin(fi) * Math.sin(delta) + Math.cos(fi) * Math.cos(delta) * Math.cos(H_rad);
       sin_h = Math.max(-1.0, Math.min(1.0, sin_h));
       const h = Math.asin(sin_h);
-      
+
       let cos_A = (Math.sin(delta) - Math.sin(fi) * Math.sin(h)) / (Math.cos(fi) * Math.cos(h));
       cos_A = Math.max(-1.0, Math.min(1.0, cos_A));
       let A = Math.acos(cos_A);
-      
+
       if (Math.sin(H_rad) > 0) {
         A = 2 * Math.PI - A;
       }
-      
+
       let altitude_deg = h * 180 / Math.PI;
       altitude_deg += stellarium_refraction(altitude_deg);
       const azimuth_deg = A * 180 / Math.PI;
-      
+
       return [azimuth_deg, altitude_deg];
     }
 
@@ -667,22 +667,22 @@ Meeus 2 издания)
       const a = 6378137.0;
       const f = 1 / 298.257223563;
       const b = a * (1 - f);
-      
+
       const phi1 = lat1 * Math.PI / 180;
       const lambda1 = lon1 * Math.PI / 180;
       const alpha1 = azi1 * Math.PI / 180;
-      
+
       const tanU1 = (1 - f) * Math.tan(phi1);
       const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
       const sinU1 = tanU1 * cosU1;
       const sin_alpha1 = Math.sin(alpha1);
       const cos_alpha1 = Math.cos(alpha1);
-      
+
       const sigma1 = Math.atan2(tanU1, cos_alpha1);
-      
+
       const sin_alpha = cosU1 * sin_alpha1;
       const cos2_alpha = 1 - sin_alpha * sin_alpha;
-      
+
       let u2, A, B;
       if (Math.abs(cos2_alpha) < 1e-20) {
         u2 = 0.0;
@@ -693,55 +693,55 @@ Meeus 2 издания)
         A = 1 + u2 / 16384 * (4096 + u2 * (-768 + u2 * (320 - 175 * u2)));
         B = u2 / 1024 * (256 + u2 * (-128 + u2 * (74 - 47 * u2)));
       }
-      
+
       let sigma = s / (b * A);
-      
+
       for (let i = 0; i < 200; i++) {
         const cos2_sigma_m = Math.cos(2 * sigma1 + sigma);
         const sin_sigma = Math.sin(sigma);
         const cos_sigma = Math.cos(sigma);
-        
+
         const delta_sigma = B * sin_sigma * (cos2_sigma_m + B / 4 * (
           cos_sigma * (-1 + 2 * cos2_sigma_m * cos2_sigma_m) -
           B / 6 * cos2_sigma_m * (-3 + 4 * sin_sigma * sin_sigma) *
           (-3 + 4 * cos2_sigma_m * cos2_sigma_m)
         ));
-        
+
         const sigma_prev = sigma;
         sigma = s / (b * A) + delta_sigma;
-        
+
         if (Math.abs(sigma - sigma_prev) < 1e-12) {
           break;
         }
       }
-      
+
       const cos2_sigma_m = Math.cos(2 * sigma1 + sigma);
       const sin_sigma = Math.sin(sigma);
       const cos_sigma = Math.cos(sigma);
-      
+
       const phi2_num = sinU1 * cos_sigma + cosU1 * sin_sigma * cos_alpha1;
       const phi2_den = (1 - f) * Math.sqrt(sin_alpha * sin_alpha +
         Math.pow(sinU1 * sin_sigma - cosU1 * cos_sigma * cos_alpha1, 2));
       const phi2 = Math.atan2(phi2_num, phi2_den);
-      
+
       const lambda_num = sin_sigma * sin_alpha1;
       const lambda_den = cosU1 * cos_sigma - sinU1 * sin_sigma * cos_alpha1;
       const lambda_diff = Math.atan2(lambda_num, lambda_den);
-      
+
       const C = f / 16 * cos2_alpha * (4 + f * (4 - 3 * cos2_alpha));
       const L = lambda_diff - (1 - C) * f * sin_alpha * (
-        sigma + C * sin_sigma * (cos2_sigma_m + C * cos_sigma * 
+        sigma + C * sin_sigma * (cos2_sigma_m + C * cos_sigma *
         (-1 + 2 * cos2_sigma_m * cos2_sigma_m)));
-      
+
       const lambda2 = lambda1 + L;
-      
+
       const alpha2 = Math.atan2(sin_alpha,
         -sinU1 * sin_sigma + cosU1 * cos_sigma * cos_alpha1);
-      
+
       const lat2 = phi2 * 180 / Math.PI;
       const lon2 = lambda2 * 180 / Math.PI;
       const azi2 = (alpha2 * 180 / Math.PI + 360) % 360;
-      
+
       return [lat2, lon2, azi2];
     }
 
@@ -750,23 +750,23 @@ Meeus 2 издания)
       if (pos_list.length > 100) {
         throw new Error("Open Topo Data API ограничивает 100 точками за запрос");
       }
-      
+
       const locations = pos_list.map(pos => `${pos[0]},${pos[1]}`).join("|");
       const baseUrl = `https://api.opentopodata.org/v1/${dataset}`;
       const params = {
         'locations': locations,
         'interpolation': interpolation
       };
-      
+
       const queryString = new URLSearchParams(params).toString();
-      
+
       // Используем CORS-прокси
       const corsProxy = "https://corsproxy.io/?";
       const url = corsProxy + encodeURIComponent(`${baseUrl}?${queryString}`);
-      
+
       try {
         debugInfo += `[РЕШЕНИЕ 1] Запрос через CORS-прокси: ${url.substring(0, 100)}...\n`;
-        
+
         const response = await fetch(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Python Elevation Client)',
@@ -774,17 +774,17 @@ Meeus 2 издания)
           },
           timeout: 15000 // 15 секунд таймаут
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`HTTP Error ${response.status}: ${errorText.substring(0, 200)}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'OK') {
           debugInfo += `[РЕШЕНИЕ 1] Успешно получено ${data.results.length} высот\n`;
-          return data.results.map(result => 
+          return data.results.map(result =>
             result.elevation !== null ? Math.round(result.elevation) : 0
           );
         } else {
@@ -801,17 +801,17 @@ Meeus 2 издания)
       if (pos_list.length > 100) {
         throw new Error("Open-Elevation API ограничивает 100 точками за запрос");
       }
-      
+
       const locations = pos_list.map(pos => ({
         latitude: pos[0],
         longitude: pos[1]
       }));
-      
+
       const url = "https://api.open-elevation.com/api/v1/lookup";
-      
+
       try {
         debugInfo += `[РЕШЕНИЕ 2] Запрос к Open-Elevation API\n`;
-        
+
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -823,16 +823,16 @@ Meeus 2 издания)
           }),
           timeout: 15000
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP Error ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.results && data.results.length > 0) {
           debugInfo += `[РЕШЕНИЕ 2] Успешно получено ${data.results.length} высот\n`;
-          return data.results.map(result => 
+          return data.results.map(result =>
             result.elevation !== null ? Math.round(result.elevation) : 0
           );
         } else {
@@ -847,14 +847,14 @@ Meeus 2 издания)
     // ==================== ОБЪЕДИНЕННАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ВЫСОТ ====================
     async function get_opentopodata(pos_list, dataset = "srtm30m", interpolation = "cubic") {
       debugInfo += `Запрос высот для ${pos_list.length} точек...\n`;
-      
+
       try {
         // Пробуем Решение 1 (OpenTopoData с CORS-прокси)
         debugInfo += `Пробуем Решение 1 (OpenTopoData с CORS-прокси)...\n`;
         return await get_opentopodata_solution1(pos_list, dataset, interpolation);
       } catch (error1) {
         debugInfo += `Решение 1 не сработало: ${error1.message}\n`;
-        
+
         try {
           // Пробуем Решение 2 (Open-Elevation)
           debugInfo += `Пробуем Решение 2 (Open-Elevation API)...\n`;
@@ -870,12 +870,12 @@ Meeus 2 издания)
       const l = Math.floor(dist_m / step_m) + 1;
       const result = new Array(l);
       result[0] = [lat, lon];
-      
+
       for (let i = 1; i < l; i++) {
         const t = vincenty_direct(lat, lon, az, step_m * i);
         result[i] = [t[0], t[1]];
       }
-      
+
       return result;
     }
 
@@ -888,21 +888,21 @@ Meeus 2 издания)
       const R_eff = R / (1 - k);
       const observer_total = h_list[0] + h_observer;
       const h_corrected = new Array(h_list.length);
-      
+
       h_corrected[0] = h_list[0] - observer_total;
-      
+
       for (let i = 1; i < h_list.length; i++) {
         const dist = i * step;
         h_corrected[i] = h_list[i] - observer_total - (dist * dist) / (2 * R_eff);
       }
-      
+
       return h_corrected;
     }
 
     function horizon(corrected, h_list, step = 50) {
       let tan_h_max = -Infinity;
       let i_max = 0;
-      
+
       for (let i = 1; i < corrected.length; i++) {
         const dist = i * step;
         const tan_h = corrected[i] / dist;
@@ -911,7 +911,7 @@ Meeus 2 издания)
           i_max = i;
         }
       }
-      
+
       const alpha = Math.atan(tan_h_max) * 180 / Math.PI;
       return [h_list[i_max], i_max * step, alpha];
     }
@@ -925,7 +925,7 @@ Meeus 2 издания)
            w_div = -1,
            hrzn_i = 0,
            scr_w = 32) {
-      
+
       function rnd(x, div) {
         return Math.round(x / div) * div;
       }
@@ -938,15 +938,15 @@ Meeus 2 издания)
         Math.round(max_h).toString().length,
         Math.round(min_h).toString().length
       );
-      
+
       let result = "";
-      
+
       if (w_div === -1) {
         scr_w -= insert;
         const total_w = corrected.length;
         w_div = Math.round(total_w / scr_w);
       }
-      
+
       let actualStep = step;
       let processedCorrected = [...corrected];
       let processedHrznI = hrzn_i;
@@ -954,7 +954,7 @@ Meeus 2 издания)
         actualStep *= w_div;
         processedHrznI = Math.round(hrzn_i / w_div);
         processedCorrected = [];
-        
+
         for (let i = 0; i < corrected.length; i += w_div) {
           // В Python оригинале ЗАКОММЕНТИРОВАНО условие if i == 0!
           // Поэтому ВСЕГДА берем max из среза
@@ -966,29 +966,24 @@ Meeus 2 издания)
        processedHrznI -= 1
       }
       const x = Math.round(delta / h_div);
-      //let debug = `graph corrected: ${processedCorrected.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
-      //debug += `graph corrected: ${processedCorrected.slice(0, 50).map(h => h.toFixed(1)).join(', ')}\n`;
-      //debug += `\n\n${x} ${delta} ${h_div} ${min_h} ${h_div} \n`;
       for (let i = 0; i < processedCorrected.length; i++) {
         let h = processedCorrected[i];
         h += h_observer;
         const l = Math.round((h - min_h) / h_div);
-        //debug += `${h.toFixed(1)} `;
         let c;
         if (i === processedHrznI) {
           c = "A";
         } else {
           c = "o";
         }
-        
-        result += c.repeat(l + 1) + 
-             ".".repeat(x - l) + 
+
+        result += c.repeat(l + 1) +
+             ".".repeat(x - l) +
              "\n";
       }
-      //debug += `\n`;
       const d = Math.round(delta / h_div);
       const vals = [];
-      
+
       for (let i = d; i >= 0; i--) {
         const value = rnd(i * h_div + min_h, h_div);
         if (value === observer_mark) {
@@ -997,31 +992,31 @@ Meeus 2 издания)
           vals.push(value.toString().padStart(insert, ".") + "|");
         }
       }
-      
+
       const rows = result.slice(0, -1).split("\n");
       result = "";
-      
+
       // поворот на 90° против часовой стрелки
       const maxRowLength = Math.max(...rows.map(row => row.length));
       let rotated = [];
-      
+
       for (let i = 0; i < maxRowLength; i++) {
         const col = rows.map(row => row[i] || " ");
         rotated.push(col);
       }
       rotated = rotated.reverse();
-      
+
       for (let i = 0; i < vals.length; i++) {
-        result += vals[i] + 
-             rotated[i].join("") + 
+        result += vals[i] +
+             rotated[i].join("") +
              "\n";
       }
-      
-      result += ".".repeat(insert) + 
-           "+" + 
-           "~".repeat(processedCorrected.length) + 
+
+      result += ".".repeat(insert) +
+           "+" +
+           "~".repeat(processedCorrected.length) +
            "\n";
-      
+
       const nums = [];
       for (let i = 0; i <= processedCorrected.length; i++) {
         if (i % 2 === 0) {
@@ -1030,11 +1025,11 @@ Meeus 2 издания)
           nums.push("0");
         }
       }
-      
+
       const maxLen = Math.max(...nums.map(n => n.length));
       const paddedNums = nums.map(n => n.padStart(maxLen, "0"));
       const scale = [];
-      
+
       for (let pos = 0; pos < maxLen; pos++) {
         let line = ".".repeat(insert);
         for (let n of paddedNums) {
@@ -1047,16 +1042,16 @@ Meeus 2 издания)
         }
         scale.push(line);
       }
-      
+
       result += scale.join("\n");
-      return result;//+debug;
+      return result;
     }
 
 
     // ==================== ОСНОВНАЯ ФУНКЦИЯ РАСЧЕТА РЕЛЬЕФА С ОТЛАДКОЙ ====================
     async function calc_with_relief(dist = 15950, step = 50) {
       debugInfo = "=== НАЧАЛО РАСЧЕТА РЕЛЬЕФА ===\n\n";
-      
+
       try {
         const latitude = parseFloat(document.getElementById('latitude').value);
         const longitude = parseFloat(document.getElementById('longitude').value);
@@ -1065,7 +1060,7 @@ Meeus 2 издания)
         const dst = dst_element ? dst_element.value : "0";
         const morning_twilight = parseFloat(document.getElementById('angle1').value);
         const evening_twilight = parseFloat(document.getElementById('angle2').value);
-        
+
         debugInfo += `Входные параметры:\n`;
         debugInfo += `Широта: ${latitude}\n`;
         debugInfo += `Долгота: ${longitude}\n`;
@@ -1073,76 +1068,76 @@ Meeus 2 издания)
         debugInfo += `Угол 2: ${evening_twilight}\n`;
         debugInfo += `Дистанция: ${dist} м\n`;
         debugInfo += `Шаг: ${step} м\n\n`;
-        
+
         if (isNaN(latitude) || isNaN(longitude)) {
           debugInfo += "Ошибка: Не заданы координаты\n";
           return debugInfo;
         }
-        
+
         if (latitude >= 60) {
           debugInfo += "Ошибка: Невозможно рассчитать рельеф севернее 60° с.ш.\n";
           return debugInfo;
         }
-        
+
         const ut = Math.floor(Date.now() / 1000);
         const base_ut = ut - (ut % 86400) + 12 * 3600;
-        
+
         debugInfo += `Текущее время (UTC): ${new Date(ut * 1000).toISOString()}\n`;
         debugInfo += `Базовое время для расчетов (UTC): ${new Date(base_ut * 1000).toISOString()}\n\n`;
-        
+
         // Получаем времена намазов для определения азимутов
         const t_result = calc_plus(latitude, longitude, base_ut, morning_twilight, evening_twilight);
         const t = t_result[0];
         const c = t_result[1];
-        
+
         debugInfo += `Результаты calc_plus:\n`;
         for (let i = 0; i < t.length; i++) {
           debugInfo += `t[${i}] = ${t[i]}\n`;
         }
         debugInfo += `Индексы для температуры/давления: ${c.join(', ')}\n\n`;
-        
+
         if (t[1] === false || t[4] === false) {
           debugInfo += "Ошибка: Не удалось рассчитать время восхода/фаджр\n";
           return debugInfo;
         }
-        
+
         debugInfo += `Время восхода (часы от полуночи UTC): ${t[1]}\n`;
         debugInfo += `Время захода (часы от полуночи UTC): ${t[4]}\n\n`;
-        
+
         // Получаем азимуты солнца в моменты восхода и фаджра
         const sunrise_ut = base_ut - 12 * 3600 + t[1] * 3600;
         const sunset_ut = base_ut - 12 * 3600 + t[4] * 3600;
-        
+
         debugInfo += `Время для расчета азимута восхода (UTC): ${new Date(sunrise_ut * 1000).toISOString()}\n`;
         debugInfo += `Время для расчета азимута захода (UTC): ${new Date(sunset_ut * 1000).toISOString()}\n\n`;
-        
+
         const az1_result = sun_az_alt(latitude, longitude, sunrise_ut);
         const az2_result = sun_az_alt(latitude, longitude, sunset_ut);
-        
+
         const az1 = az1_result[0];
         const az2 = az2_result[0];
-        
+
         debugInfo += `Азимут восхода: ${az1.toFixed(2)}°\n`;
         debugInfo += `Высота восхода: ${az1_result[1].toFixed(2)}°\n`;
         debugInfo += `Азимут захода: ${az2.toFixed(2)}°\n`;
         debugInfo += `Высота захода: ${az2_result[1].toFixed(2)}°\n\n`;
-        
+
         debugInfo += `Разница азимутов: ${Math.abs(az1 - az2).toFixed(2)}°\n`;
-        
+
         if (Math.abs(az1 - az2) < 1) {
           debugInfo += "ВНИМАНИЕ: Азимуты почти одинаковые! Это может быть ошибкой.\n\n";
         } else {
           debugInfo += "Азимуты различаются - это правильно.\n\n";
         }
-        
+
         // Создаем списки координат для восхода и заката
         debugInfo += `Создание списков координат...\n`;
         const p_list1 = make_pos_list(latitude, longitude, az1, dist, step);
         const p_list2 = make_pos_list(latitude, longitude, az2, dist, step);
-        
+
         debugInfo += `Количество точек для восхода: ${p_list1.length}\n`;
         debugInfo += `Количество точек для заката: ${p_list2.length}\n\n`;
-        
+
         debugInfo += `Первые 3 точки для восхода:\n`;
         for (let i = 0; i < Math.min(3, p_list1.length); i++) {
           debugInfo += ` [${i}]: ${p_list1[i][0].toFixed(4)}°, ${p_list1[i][1].toFixed(4)}°\n`;
@@ -1152,11 +1147,11 @@ Meeus 2 издания)
           debugInfo += ` [${i}]: ${p_list2[i][0].toFixed(4)}°, ${p_list2[i][1].toFixed(4)}°\n`;
         }
         debugInfo += `\n`;
-        
+
         // Проверяем, разные ли координаты
         const same_coords = p_list1[1][0] === p_list2[1][0] && p_list1[1][1] === p_list2[1][1];
         debugInfo += `Координаты второй точки одинаковые? ${same_coords ? 'ДА - ОШИБКА!' : 'НЕТ - правильно'}\n\n`;
-        
+
         // Получаем высоты для точек восхода
         debugInfo += `Получение высот для точек восхода...\n`;
         let h_list1 = [];
@@ -1188,45 +1183,45 @@ Meeus 2 издания)
             throw error;
           }
         }
-        
+
         debugInfo += `\nПервые 50 высот для восхода: ${h_list1.slice(0, 50).join(', ')}\n`;
         debugInfo += `Первые 50 высот для заката: ${h_list2.slice(0, 50).join(', ')}\n\n`;
-        
+
         // Проверяем, разные ли высоты
         const same_heights = JSON.stringify(h_list1.slice(0, 5)) === JSON.stringify(h_list2.slice(0, 5));
         debugInfo += `Высоты одинаковые? ${same_heights ? 'ДА - возможно ошибка' : 'НЕТ - правильно'}\n\n`;
-        
+
         // Применяем коррекции
         debugInfo += `Применение коррекций...\n`;
         const hc1 = correction(h_list1, step, 1.75, c[1]);
         const hc2 = correction(h_list2, step, 1.75, c[4]);
-        
+
         debugInfo += `Индекс для температуры/давления восхода: ${c[1]}\n`;
         debugInfo += `Индекс для температуры/давления заката: ${c[4]}\n`;
         debugInfo += `Температура восхода: ${m_temp.length > c[1] ? m_temp[c[1]] : 'нет данных'}\n`;
         debugInfo += `Давление восхода: ${m_pres.length > c[1] ? m_pres[c[1]] : 'нет данных'}\n`;
         debugInfo += `Температура заката: ${m_temp.length > c[4] ? m_temp[c[4]] : 'нет данных'}\n`;
         debugInfo += `Давление заката: ${m_pres.length > c[4] ? m_pres[c[4]] : 'нет данных'}\n\n`;
-        
+
         // Находим горизонт
         debugInfo += `Поиск горизонта...\n`;
         const [h1, d1, a1] = horizon(hc1, h_list1, step);
         const [h2, d2, a2] = horizon(hc2, h_list2, step);
-        
+
         debugInfo += `Восход: высота=${h1.toFixed(0)}м, дистанция=${d1}м, угол=${a1.toFixed(4)}°\n`;
         debugInfo += `Закат: высота=${h2.toFixed(0)}м, дистанция=${d2}м, угол=${a2.toFixed(4)}°\n\n`;
-        
+
         // Находим координаты точек горизонта
         debugInfo += `Расчет координат точек горизонта...\n`;
         const t1 = vincenty_direct(latitude, longitude, az1, d1);
         const t2 = vincenty_direct(latitude, longitude, az2, d2);
-        
+
         debugInfo += `Точка горизонта восхода: ${t1[0].toFixed(4)}°, ${t1[1].toFixed(4)}°\n`;
         debugInfo += `Точка горизонта заката: ${t2[0].toFixed(4)}°, ${t2[1].toFixed(4)}°\n\n`;
-        
+
         // hrzn_i1 и hrzn_i2 - индексы точек горизонта:
         const hrzn_i1 = Math.floor(d1 / step); // для восхода
-        const hrzn_i2 = Math.floor(d2 / step); // для заката 
+        const hrzn_i2 = Math.floor(d2 / step); // для заката
 
         // Отладка для понимания высот
         debugInfo += `\nОтладка высот для графика:\n`;
@@ -1262,7 +1257,7 @@ Meeus 2 издания)
           //ptm_str += `(коррекция угла горизонта:
         //восход ${a1.toFixed(2)}°
         //заход ${a2.toFixed(2)}°)\n\n`;
-          
+
         // Восход - индекс 1, Магриб - индекс 4 в массиве namazlar
         const sunriseIndex = 1; // "Восход"
         const maghribIndex = 4; // "Магриб"
@@ -1278,7 +1273,7 @@ Meeus 2 издания)
           ptm_str = "Не удалось рассчитать время намазов с учетом рельефа";
         }
 
-                
+
         // Формируем итоговый результат
         //const info = `=== ИТОГОВЫЕ РЕЗУЛЬТАТЫ РАСЧЕТА РЕЛЬЕФА ===
         //const info = `${ptm_str}
@@ -1287,18 +1282,18 @@ Meeus 2 издания)
 ВОСХОД : ${ptm.times[1].today}
 Азимут : ${az1.toFixed(2)}°
 Локация: ${t1[0].toFixed(4)}°, ${t1[1].toFixed(4)}°
-Высота : ${h1.toFixed(0)}m
-Дистанц: ${d1}m
+Высота : ${h1.toFixed(0)}м
+Дистанц: ${d1}м
 Угол   : ${a1.toFixed(4)}°
 Темп.  : ${m_temp[c[1]]}°C
 Давл.  : ${m_pres[c[1]]}гПа
-${sunriseGraph} 
+${sunriseGraph}
 
 ЗАХОД  : ${ptm.times[4].today}
 Азимут : ${az2.toFixed(2)}°
 Локация: ${t2[0].toFixed(4)}°, ${t2[1].toFixed(4)}°
-Высота : ${h2.toFixed(0)}m
-Дистанц: ${d2}m
+Высота : ${h2.toFixed(0)}м
+Дистанц: ${d2}м
 Угол   : ${a2.toFixed(4)}°
 Темп.  : ${m_temp[c[4]]}°C
 Давл.  : ${m_pres[c[4]]}гПа
@@ -1311,9 +1306,9 @@ ________________________
 
 //=== ИНФОРМАЦИЯ ОТЛАДКИ ===
 //${debugInfo}`;
-        
+
         return info;
-        
+
       } catch (error) {
         debugInfo += `\n❌ КРИТИЧЕСКАЯ ОШИБКА: ${error.message}\n`;
         return `❌ НЕВОЗМОЖНО РАССЧИТАТЬ РЕЛЬЕФ\n\n${debugInfo}\n\nПричина: ${error.message}\n\nПопробуйте:\n1. Проверить интернет-соединение\n2. Убедиться, что координаты корректны\n3. Попробовать позже (API могут быть временно недоступны)`;
@@ -1329,7 +1324,7 @@ ________________________
       const morn_tw = parseFloat(morning_twilight);
       const even_tw = parseFloat(evening_twilight);
 
-      if (isNaN(lat) || isNaN(lon) || isNaN(tz) || isNaN(dst_num) || 
+      if (isNaN(lat) || isNaN(lon) || isNaN(tz) || isNaN(dst_num) ||
         isNaN(morn_tw) || isNaN(even_tw)) {
         return {error: "Ошибка: неверные параметры расчета"};
       }
@@ -1337,14 +1332,14 @@ ________________________
       try {
         const ut = Math.floor(Date.now() / 1000);
         const base_ut = ut - (ut % 86400) + 12 * 3600;
-        
+
         if (useWeatherData) {
           const weatherData = await get_weather_forecast(lat, lon);
           if (weatherData && weatherData.hourly) {
             m_dttm = [];
             m_temp = [];
             m_pres = [];
-            
+
             for (let i = 0; i < 48; i++) {
               if (weatherData.hourly.time[i]) {
                 m_dttm.push(get_ut(weatherData.hourly.time[i]));
@@ -1361,7 +1356,7 @@ ________________________
           m_dttm = [];
           m_temp = [];
           m_pres = [];
-          
+
           for (let i = 0; i < 48; i++) {
             m_dttm.push(base_ut + i * 3600);
             m_temp.push(15);
@@ -1371,7 +1366,7 @@ ________________________
 
         const t_result = calc_plus(lat, lon, base_ut, morn_tw, even_tw, sunrise_angle, sunset_angle);
         const p_result = calc_plus(lat, lon, base_ut + 86400, morn_tw, even_tw, sunrise_angle, sunset_angle);
-        
+
         const t = t_result[0];
         const p = p_result[0];
 
@@ -1458,10 +1453,10 @@ ________________________
 
     function updateCurrentDateTime() {
       const now = new Date();
-      const dateOptions = { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
+      const dateOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
         day: 'numeric'
       };
       const timeOptions = {
@@ -1488,9 +1483,9 @@ ________________________
         const dst = dst_element ? dst_element.value : "0";
         const morning_twilight = document.getElementById('angle1').value;
         const evening_twilight = document.getElementById('angle2').value;
-        
+
         document.getElementById('prayerTimesTable').innerHTML = '<div class="white-night">Расчет времени намазов...</div>';
-        
+
         const result = await get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight);
 
         if (result.error) {
@@ -1542,10 +1537,10 @@ ________________________
 
     async function calculateRelief() {
       const reliefResult = document.getElementById('reliefResult');
-      
+
       reliefResult.style.display = 'block';
       reliefResult.textContent = "Идет расчет рельефа...\nЭто может занять 10-20 секунд.\n\nПробуем получить реальные данные высот...";
-      
+
       try {
         const result = await calc_with_relief();
         reliefResult.textContent = result;
@@ -1578,7 +1573,7 @@ ________________________
 
             document.getElementById('angle1').value = settings[4] || '18';
             document.getElementById('angle2').value = settings[5] || '17';
-            
+
             if (settings[6] === '1') {
               document.getElementById('useWeather').checked = true;
               useWeatherData = true;
@@ -1608,7 +1603,7 @@ ________________________
         const angle1 = document.getElementById('angle1').value;
         const angle2 = document.getElementById('angle2').value;
         const useWeather = document.getElementById('useWeather').checked ? '1' : '0';
-        
+
         useWeatherData = document.getElementById('useWeather').checked;
 
         const settingsString = [latitude, longitude, timezone, daylight, angle1, angle2, useWeather].join(';');
@@ -1648,11 +1643,11 @@ ________________________
       document.getElementById('mainPage').style.display = 'block';
       document.getElementById('settingsPage').style.display = 'none';
       document.getElementById('reliefResult').style.display = 'none';
-      
+
       document.getElementById('useWeather').addEventListener('change', function() {
         useWeatherData = this.checked;
       });
-      
+
       updateCurrentDateTime();
       loadSettings();
 
