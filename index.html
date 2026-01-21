@@ -1238,8 +1238,8 @@ Meeus 2 издания)
         debugInfo += `Индекс горизонта: ${hrzn_i2}, значение: ${hc2[hrzn_i2] + h_list2[0]} м\n`;
 
 
-        const sunriseGraph = graph(hc1, h_list1[0], step, 10, 5, hrzn_i1, 36);
-        const sunsetGraph = graph(hc2, h_list2[0], step, 10, 5, hrzn_i2, 36);
+        const sunriseGraph = graph(hc1, h_list1[0], step, 10, 2, hrzn_i1, 36);
+        const sunsetGraph = graph(hc2, h_list2[0], step, 10, 2, hrzn_i2, 36);
 
 
         const ptm = await get_today(latitude, longitude, time_zone, dst, morning_twilight, evening_twilight, a1, a2);
