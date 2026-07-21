@@ -1387,8 +1387,8 @@ ________________________
           const tt_offset = tz + is_dst(base_ut + t[i] * 3600.0, tz, dst_num);
           const tp_offset = tz + is_dst(base_ut + p[i] * 3600.0 + 86400, tz, dst_num);
 
-          let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
-          let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
+          //let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
+          //let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
 
           let todayTime;
           if (t[i] !== false) {
