@@ -100,19 +100,21 @@ Meeus 2 издания)
     .prayer-table th, .prayer-table td {
       padding: 16px 12px;
       text-align: left;
+      //border-radius: 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.2);}
     .prayer-table th {
       background-color: rgba(255, 255, 255, 0.2);
       font-weight: bold;
       text-align: center;
+      //border-radius: 8px;
       font-size: clamp(14px, 3vw, 18px);}
     /* Цвета для разных времен намаза */
-    .fajr {background: linear-gradient(90deg, rgba(25, 25, 112, 0.9) 0%, rgba(65, 105, 225, 0.7) 100%);}
-    .sunrise {background: linear-gradient(90deg, rgba(255, 140, 0, 0.9) 0%, rgba(255, 165, 0, 0.7) 100%);}
-    .dhuhr {background: linear-gradient(90deg, rgba(255, 215, 0, 0.9) 0%, rgba(255, 255, 0, 0.7) 100%);}
-    .asr {background: linear-gradient(90deg, rgba(255, 140, 0, 0.7) 0%, rgba(255, 69, 0, 0.5) 100%);}
-    .maghrib {background: linear-gradient(90deg, rgba(178, 34, 34, 0.9) 0%, rgba(255, 69, 0, 0.7) 100%);}
-    .isha {background: linear-gradient(90deg, rgba(25, 25, 112, 0.7) 0%, rgba(0, 0, 139, 0.9) 100%);}
+    .fajr    {background: linear-gradient(90deg, rgba( 25,  25, 112, 0.9) 0%, rgba( 65, 105, 225, 0.7) 100%);}
+    .sunrise {background: linear-gradient(90deg, rgba(255, 140,   0, 0.9) 0%, rgba(255, 165,   0, 0.7) 100%);}
+    .dhuhr   {background: linear-gradient(90deg, rgba(255, 215,   0, 0.9) 0%, rgba(255, 255,   0, 0.7) 100%);}
+    .asr     {background: linear-gradient(90deg, rgba(255, 140,   0, 0.7) 0%, rgba(255,  69,   0, 0.5) 100%);}
+    .maghrib {background: linear-gradient(90deg, rgba(178,  34,  34, 0.9) 0%, rgba(255,  69,   0, 0.7) 100%);}
+    .isha    {background: linear-gradient(90deg, rgba( 25,  25, 112, 0.7) 0%, rgba(  0,   0, 139, 0.9) 100%);}
     button {
       padding: 15px 25px;
       font-size: clamp(16px, 4vw, 18px);
@@ -174,8 +176,9 @@ Meeus 2 издания)
       margin-top: 2px;
       padding: 12px;
       margin-bottom: 8px;
-      background: rgba(168, 216, 255, 0.2);
-      border-radius: 8px;
+      //background: rgba(168, 216, 255, 0.2);
+      background: linear-gradient(90deg, rgba(168, 216, 255, 0.2) 0%, rgba( 65, 105, 225, 0.7) 100%);
+      //border-radius: 8px;
       font-size: clamp(14px, 3vw, 16px);}
     .relief-result {
       margin-top: 10px;
@@ -289,7 +292,7 @@ Meeus 2 издания)
     const months_long = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
     const namazlar = ['Фаджр', 'Восход', 'Зухр', 'Аср', 'Магриб', 'Иша'];
     const prayerClasses = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    const no_night = "\"Белые ночи\" - абсолютная ночь не наступает, рассчет Фаджр и Иша произведен для ближайшего места где наступает ночь";
+    const no_night = "\"Белые ночи\" - Солнце не опускается под горизонт на угол сумерек, поэтому абсолютная ночь не наступает. Расчет Фаджр и Иша произведен для ближайшего места где наступает ночь.";
 
     // Глобальные переменные
     let m_dttm = [];
@@ -569,6 +572,7 @@ Meeus 2 издания)
         if (t[6]) {
           let adjusted_latitude = Math.acos(-Math.sin(-morning_twilight * Math.PI / 180)) * 180 / Math.PI - dec;
           adjusted_latitude -= 9e-8;
+          window.adjustedLatitudeForWhiteNights = adjusted_latitude; // Сохраняем для вывода
           latitude = adjusted_latitude;
           ff = Level(morning_twilight);
           ii = Level(evening_twilight);
@@ -956,8 +960,6 @@ Meeus 2 издания)
         processedCorrected = [];
 
         for (let i = 0; i < corrected.length; i += w_div) {
-          // В Python оригинале ЗАКОММЕНТИРОВАНО условие if i == 0!
-          // Поэтому ВСЕГДА берем max из среза
           const slice = corrected.slice(i, i + w_div);
           processedCorrected.push(Math.max(...slice));
         }
@@ -1357,7 +1359,7 @@ ________________________
           m_temp = [];
           m_pres = [];
 
-          for (let i = 0; i < 48; i++) {
+          for (let i = 0; i < 72; i++) {
             m_dttm.push(base_ut + i * 3600);
             m_temp.push(15);
             m_pres.push(1013.25);
@@ -1542,8 +1544,16 @@ ________________________
           </table>
         `;
 
-        if (result.hasWhiteNights) {
+/*        if (result.hasWhiteNights) {
           tableHTML += `<div class="white-night">${no_night}</div>`;
+        }
+*/
+        if (result.hasWhiteNights) {
+          const adjLat = window.adjustedLatitudeForWhiteNights;
+          const adjLatStr = adjLat ? adjLat.toFixed(4) : 'неизвестно';
+          const origLat = parseFloat(latitude).toFixed(4);
+          const origLon = parseFloat(longitude).toFixed(4);
+          tableHTML += `<div class="white-night">${no_night}<br><small>Расчёт для: ${adjLatStr}°, ${origLon}° (исх. шир.: ${origLat}°)</small></div>`;
         }
 
         document.getElementById('prayerTimesTable').innerHTML = tableHTML;
