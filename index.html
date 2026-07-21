@@ -1381,12 +1381,31 @@ ________________________
           hasWhiteNights: false
         };
 
+        const hours_ut = (ut % 86400) / 3600.0;
+
         for (let i = 0; i < 6; i++) {
           const tt_offset = tz + is_dst(base_ut + t[i] * 3600.0, tz, dst_num);
           const tp_offset = tz + is_dst(base_ut + p[i] * 3600.0 + 86400, tz, dst_num);
 
           let todayTime = t[i] !== false ? f_to_hms_str(t[i] + tt_offset) : "--:--:--";
           let tomorrowTime = p[i] !== false ? f_to_hms_str(p[i] + tp_offset) : "--:--:--";
+
+          let todayTime;
+          if (t[i] !== false) {
+              todayTime = f_to_hms_str(t[i] + tt_offset);
+              if (t[i] < hours_ut) {
+                  todayTime = `<s>`+todayTime+`</s>`
+              }
+          } else {
+              todayTime = "--:--:--";
+          }
+          let tomorrowTime;
+          if (p[i] !== false) {
+              tomorrowTime = f_to_hms_str(p[i] + tp_offset);
+          } else {
+              tomorrowTime = "--:--:--";
+          }
+
 
           let isWhiteNight = false;
           if (t[6]) {
