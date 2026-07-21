@@ -448,7 +448,7 @@ Meeus 2 издания)
 
     // ==================== ПОГОДНЫЙ API ====================
     async function get_weather_forecast(lat, lon) {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,pressure_msl&timezone=auto&forecast_days=2`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,pressure_msl&timezone=auto&forecast_days=3`;
 
       try {
         const response = await fetch(url, {
